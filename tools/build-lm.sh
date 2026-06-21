@@ -10,5 +10,6 @@ if [ ! -d "$WORK/McBopomofo" ]; then
 fi
 cd "$WORK/McBopomofo/Source/Data"
 make            # runs main_compiler.py -> data.txt
+[ -s data.txt ] || { echo "ERROR: make produced no data.txt (empty or missing)" >&2; exit 1; }
 cp data.txt "$ROOT/Resources/data.txt"
 echo "Wrote $ROOT/Resources/data.txt ($(wc -l < "$ROOT/Resources/data.txt") lines)"
