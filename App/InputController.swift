@@ -6,11 +6,15 @@ import KeyKeyEngine
 private enum LayoutChoice: String {
     case standard
     case eten
+    case hsu
+    case eten26
 
     func makeLayout() -> PhoneticLayout {
         switch self {
         case .standard: return StandardLayout()
         case .eten: return EtenLayout()
+        case .hsu: return HsuLayout()
+        case .eten26: return Eten26Layout()
         }
     }
 }
@@ -111,7 +115,8 @@ final class InputController: IMKInputController {
     override func menu() -> NSMenu! {
         let menu = NSMenu()
         let current = LayoutChoice(rawValue: defaults.string(forKey: layoutDefaultsKey) ?? "") ?? .standard
-        for (choice, title) in [(LayoutChoice.standard, "Standard (大千)"), (.eten, "ETen (倚天)")] {
+        for (choice, title) in [(LayoutChoice.standard, "Standard (大千)"), (.eten, "ETen (倚天)"),
+                                (.hsu, "Hsu (許氏)"), (.eten26, "ETen 26 (倚天26鍵)")] {
             let item = NSMenuItem(title: title, action: #selector(switchLayout(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = choice.rawValue
