@@ -7,17 +7,18 @@ public struct ReadingBuffer {
         case unhandled           // key not part of the layout
     }
 
+    private let layout: PhoneticLayout
     private var syllable = Syllable()
     // order in which classes were set, to support backspace
     private var order: [Class] = []
     private enum Class { case consonant, medial, vowel, tone }
 
-    public init() {}
+    public init(layout: PhoneticLayout = StandardLayout()) { self.layout = layout }
 
     public var isEmpty: Bool { syllable.isEmpty }
 
     public mutating func receive(_ key: Character) -> Result {
-        guard let component = StandardLayout.component(for: key) else { return .unhandled }
+        guard let component = layout.component(for: key) else { return .unhandled }
         switch component {
         case .consonant(let c):
             syllable.consonant = c

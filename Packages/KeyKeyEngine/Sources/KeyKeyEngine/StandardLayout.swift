@@ -7,7 +7,15 @@ public enum Component: Equatable {
     case tone(Character?)   // nil == tone 1 (no mark)
 }
 
-public enum StandardLayout {
+// A keyboard-to-phoneme mapping. Lets ReadingBuffer stay layout-agnostic.
+public protocol PhoneticLayout {
+    func component(for key: Character) -> Component?
+}
+
+public struct StandardLayout: PhoneticLayout {
+    public init() {}
+
+
     private static let consonants: [Character: Character] = [
         "1": "ㄅ", "q": "ㄆ", "a": "ㄇ", "z": "ㄈ",
         "2": "ㄉ", "w": "ㄊ", "s": "ㄋ", "x": "ㄌ",
@@ -35,5 +43,9 @@ public enum StandardLayout {
         if let v = vowels[key] { return .vowel(v) }
         if let t = tones[key] { return .tone(t) }   // value may itself be nil (tone 1)
         return nil
+    }
+
+    public func component(for key: Character) -> Component? {
+        StandardLayout.component(for: key)
     }
 }

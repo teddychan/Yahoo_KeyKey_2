@@ -1,14 +1,19 @@
 // Orchestrates the reading buffer and the grid walk. The IMK controller talks only to this.
 public final class SmartPhoneticEngine {
     private let lm: LanguageModel
-    private var buffer = ReadingBuffer()
+    private let layout: PhoneticLayout
+    private var buffer: ReadingBuffer
     private var readings: [String] = []
     // FIX 4: map reading position -> chosen VALUE (not candidate index).
     // This lets overrides survive even when a multi-syllable phrase wins the walk
     // and compresses the walked-segment array below readings.count.
     private var overrides: [Int: String] = [:]
 
-    public init(languageModel: LanguageModel) { self.lm = languageModel }
+    public init(languageModel: LanguageModel, layout: PhoneticLayout = StandardLayout()) {
+        self.lm = languageModel
+        self.layout = layout
+        self.buffer = ReadingBuffer(layout: layout)
+    }
 
     /// Returns true if the key was consumed by the engine.
     @discardableResult
@@ -58,7 +63,7 @@ public final class SmartPhoneticEngine {
     @discardableResult
     public func commit() -> String {
         let text = composingText
-        readings = []; overrides = [:]; buffer = ReadingBuffer()
+        readings = []; overrides = [:]; buffer = ReadingBuffer(layout: layout)
         return text
     }
 }
