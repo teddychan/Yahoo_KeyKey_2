@@ -80,21 +80,17 @@ localization beyond zh-Hant; notarized installer packaging.
 
 ### 2.1 `lexicon-tools` — offline Swift CLI
 
-Decodes `KeyKey.db` → a documented, Swift-loadable language model and validates it.
+Prepares a documented, Swift-loadable language model and validates it. (Per the
+2026-06-21 spike, the source is the **open McBopomofo LM**, not `KeyKey.db` — see §4.)
 
-- **Input:** the original `KeyKey.db` (12 MB, custom packed format: a big-endian offset
-  table at the head indexing into records).
+- **Input:** the open McBopomofo language-model data (plain text).
 - **Output:** an intermediate LM with two relations, in a **single** format — a
   plain-text, mmap-loadable LM (McBopomofo-style), inspectable and fast enough at runtime:
   - **unigram:** `reading → [(phrase, score)]`
   - **bigram:** `(previousPhrase, currentPhrase) → score`
-- **Validation (no live-binary oracle):** the original is an `LSBackgroundOnly` IMK
-  server, not a CLI, so it cannot be driven headlessly to produce reference outputs.
-  Validate the decoded LM instead by:
-  - **Structural checks** — readings decode to valid Bopomofo, phrases are valid CJK,
-    scores are monotonic/plausible, counts are sane.
-  - **Cross-check against McBopomofo's open LM** — coverage and top-candidate ranking
-    agreement for a sample of readings (sanity, not byte-equality).
+- **Validation:** structural checks on the prepared LM — readings decode to valid
+  Bopomofo, phrases are valid CJK, scores are monotonic/plausible, counts are sane — plus
+  a round-trip load test from `KeyKeyEngine`.
 
 ### 2.2 `KeyKeyEngine` — pure Swift package, no UI, fully unit-tested
 
@@ -164,6 +160,28 @@ fallback** is the open **McBopomofo** language model (same engine family). This 
 explicit deviation from "exact" candidate ordering and is surfaced to the user for a
 decision before proceeding. Either way, the engine and IMK path are unaffected.
 
+### Spike outcome — 2026-06-21: NO-GO (fallback adopted)
+
+The decode was attempted and `KeyKey.db` is **encrypted**, established by evidence:
+
+- The head is a plaintext big-endian offset table (`u[0]=0x2000`, then ~3050 monotonic
+  offsets running to ≈EOF) — only the *index* is readable.
+- The body is **8.000 bits/byte entropy, uniform across all ~13 MB**, with a flat byte
+  histogram (every value ~51k) — no packed indices, no Big5/UTF-x, no plaintext (longest
+  CJK run anywhere = 2 chars, i.e. noise).
+- **0 of 14** candidate block offsets decompress under zlib/raw-deflate/gzip/bz2/lzma;
+  compression-magic counts equal chance.
+- The shipped binary statically links SQLite **with `KEY` encryption**, consistent with an
+  encrypted store.
+
+Decoding would require recovering the embedded key/cipher by disassembling the loader in
+`OpenVanilla.framework` — deep, uncertain, and edging into circumventing a protection
+measure. Out of scope for a timeboxed spike.
+
+**Decision (user pre-authorized "find other way"):** adopt the **open McBopomofo language
+model**. Consequence: typing behavior matches KeyKey's engine family, but candidate
+*ordering* will not be byte-identical to Yahoo's lexicon.
+
 ---
 
 ## 5. Error handling
@@ -183,7 +201,7 @@ InputMethodKit controllers run in-process inside other applications, so the cont
 
 - **Engine:** unit tests against a small hand-built fixture LM, plus golden tests against
   the real extracted LM for a set of known inputs → expected top candidates.
-- **Lexicon:** the structural checks + McBopomofo cross-check from §2.1.
+- **Lexicon:** the structural checks + round-trip load test from §2.1.
 - **IMK layer:** a headless harness that drives the engine exactly as `InputController`
   does (so engine↔controller wiring is testable without a live IMK session), plus a
   manual smoke test typing in TextEdit after installing to `~/Library/Input Methods`.
