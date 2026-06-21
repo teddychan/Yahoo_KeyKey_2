@@ -57,6 +57,11 @@ if [ ! -f "$ROOT/Resources/data.txt" ]; then
 fi
 cp "$ROOT/Resources/data.txt" "$APP/Contents/Resources/data.txt"
 
+echo "==> Copying localized strings (.lproj)"
+for lproj in "$APP_SRC"/*.lproj; do
+  [ -d "$lproj" ] && cp -R "$lproj" "$APP/Contents/Resources/"
+done
+
 echo "==> Ad-hoc code-signing the bundle"
 codesign --force --deep -s - "$APP"
 codesign -dv "$APP"

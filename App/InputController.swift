@@ -2,11 +2,30 @@ import Cocoa
 import InputMethodKit
 import KeyKeyEngine
 
+// Persisted phonetic-layout choice. Raw values are the keys stored in UserDefaults.
+private enum LayoutChoice: String {
+    case standard
+    case eten
+
+    func makeLayout() -> PhoneticLayout {
+        switch self {
+        case .standard: return StandardLayout()
+        case .eten: return EtenLayout()
+        }
+    }
+}
+
+private let layoutDefaultsKey = "phoneticLayout"
+
 @objc(InputController)
 final class InputController: IMKInputController {
-    private let engine: SmartPhoneticEngine
+    private let lm: LanguageModel
+    private var engine: SmartPhoneticEngine
     private let candidateWindow = CandidateWindow()
     private var selecting = false
+
+    // UserDefaults suited to the bundle id so the choice is shared across IMK clients.
+    private let defaults = UserDefaults(suiteName: Bundle.main.bundleIdentifier) ?? .standard
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         // Load the bundled LM once; fail safe to an empty model (no candidates) if missing.
@@ -18,7 +37,10 @@ final class InputController: IMKInputController {
             NSLog("YahooKeyKey: data.txt missing; running with empty LM")
             lm = LanguageModel(text: "# format org.openvanilla.mcbopomofo.sorted")
         }
-        engine = SmartPhoneticEngine(languageModel: lm)
+        self.lm = lm
+        let choice = LayoutChoice(rawValue: UserDefaults(suiteName: Bundle.main.bundleIdentifier)?
+            .string(forKey: layoutDefaultsKey) ?? "") ?? .standard
+        engine = SmartPhoneticEngine(languageModel: lm, layout: choice.makeLayout())
         super.init(server: server, delegate: delegate, client: inputClient)
     }
 
@@ -83,6 +105,31 @@ final class InputController: IMKInputController {
         client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0),
                              replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
         return true
+    }
+
+    // IMK input menu: let the user pick the phonetic keyboard layout. A check marks the active one.
+    override func menu() -> NSMenu! {
+        let menu = NSMenu()
+        let current = LayoutChoice(rawValue: defaults.string(forKey: layoutDefaultsKey) ?? "") ?? .standard
+        for (choice, title) in [(LayoutChoice.standard, "Standard (大千)"), (.eten, "ETen (倚天)")] {
+            let item = NSMenuItem(title: title, action: #selector(switchLayout(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = choice.rawValue
+            item.state = (choice == current) ? .on : .off
+            menu.addItem(item)
+        }
+        return menu
+    }
+
+    @objc private func switchLayout(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String,
+              let choice = LayoutChoice(rawValue: raw) else { return }
+        // Commit/clear any in-progress composition so the rebuilt engine starts clean.
+        _ = engine.commit()
+        selecting = false
+        candidateWindow.hide()
+        defaults.set(raw, forKey: layoutDefaultsKey)
+        engine = SmartPhoneticEngine(languageModel: lm, layout: choice.makeLayout())
     }
 
     private func refresh(_ client: IMKTextInput) {
