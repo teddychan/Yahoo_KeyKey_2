@@ -27,4 +27,10 @@ final class WalkerTests: XCTestCase {
         let grid = ReadingGrid(readings: ["ㄓㄜ"], languageModel: Self.lm)  // not in LM
         XCTAssertEqual(grid.walk().joined(), "ㄓㄜ")
     }
+
+    func testOverrideForcesCandidate() {
+        let grid = ReadingGrid(readings: ["ㄐㄧㄣ", "ㄊㄧㄢ"], languageModel: Self.lm)
+        grid.overrideCandidate(at: 0, to: "斤")
+        XCTAssertEqual(grid.walk().joined(), "斤天")
+    }
 }

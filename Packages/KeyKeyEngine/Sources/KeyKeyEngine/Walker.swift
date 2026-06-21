@@ -5,13 +5,21 @@ public final class ReadingGrid {
         public let spanningLength: Int
         public var unigrams: [Unigram]
         public var overrideIndex: Int?
-        public var current: Unigram { unigrams[overrideIndex ?? 0] }
+        // FIX 1: clamp index so an out-of-range overrideIndex never traps.
+        // Nodes always have >=1 unigram by construction, so count - 1 >= 0.
+        public var current: Unigram {
+            let i = min(max(overrideIndex ?? 0, 0), unigrams.count - 1)
+            return unigrams[i]
+        }
     }
 
     private let readings: [String]
+    // FIX 4: nodesByStart must be mutable so overrideCandidate can patch nodes.
     private var nodesByStart: [[Node]]   // nodesByStart[i] = nodes beginning at position i
     private static let maxSpan = 6
     private static let fallbackScore = -99.0
+    // FIX 4: bonus that makes an overridden node always win the Viterbi walk.
+    private static let overrideBonus = 1e9
 
     public init(readings: [String], languageModel lm: LanguageModel) {
         self.readings = readings
@@ -38,6 +46,20 @@ public final class ReadingGrid {
         }
     }
 
+    // FIX 4: Force the candidate `value` at `position` by overriding the node that offers it.
+    public func overrideCandidate(at position: Int, to value: String) {
+        guard position >= 0 && position < nodesByStart.count else { return }
+        for start in 0...position {
+            for ni in nodesByStart[start].indices
+                where position < start + nodesByStart[start][ni].spanningLength {
+                if let idx = nodesByStart[start][ni].unigrams.firstIndex(where: { $0.value == value }) {
+                    nodesByStart[start][ni].overrideIndex = idx
+                    return
+                }
+            }
+        }
+    }
+
     // Viterbi over the DAG; returns the chosen nodes' current values.
     public func walk() -> [String] {
         let n = readings.count
@@ -49,22 +71,29 @@ public final class ReadingGrid {
         for i in 0..<n where best[i] > -.infinity {
             for (ni, node) in nodesByStart[i].enumerated() {
                 let j = i + node.spanningLength
-                let score = best[i] + node.current.score
+                // FIX 4: overridden nodes get a large bonus so they always win.
+                let bonus = node.overrideIndex != nil ? Self.overrideBonus : 0
+                let score = best[i] + node.current.score + bonus
                 if score > best[j] { best[j] = score; fromIndex[j] = i; fromNode[j] = ni }
             }
         }
         var values: [String] = []
         var j = n
+        // FIX 3: guard against an unreachable position (invariant holds today via
+        // the fallback node, but explicit so a future refactor can't trap).
         while j > 0 {
             let i = fromIndex[j]
+            guard i >= 0 else { break }
             values.append(nodesByStart[i][fromNode[j]].current.value)
             j = i
         }
         return values.reversed()
     }
 
+    // FIX 2: guard out-of-range position — return empty rather than trapping.
     // Candidates overlapping a reading position, longer spans first, then file order.
     public func candidates(at position: Int) -> [String] {
+        guard position >= 0 && position < nodesByStart.count else { return [] }
         var spanned: [(span: Int, values: [String])] = []
         for start in 0...position {
             for node in nodesByStart[start]

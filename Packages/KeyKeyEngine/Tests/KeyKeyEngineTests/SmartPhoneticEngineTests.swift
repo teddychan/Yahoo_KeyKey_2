@@ -45,4 +45,25 @@ final class SmartPhoneticEngineTests: XCTestCase {
         let e = make()
         XCTAssertFalse(e.handleKey("`"))
     }
+
+    static let phraseLM = LanguageModel(text: """
+    # format org.openvanilla.mcbopomofo.sorted
+    ㄐㄧㄣ 今 -4.0
+    ㄐㄧㄣ 斤 -4.5
+    ㄊㄧㄢ 天 -4.0
+    ㄊㄧㄢ 田 -4.6
+    ㄐㄧㄣ-ㄊㄧㄢ 今天 -3.2
+    """)
+
+    func testSelectionWorksWhenPhraseWinsWalk() {
+        let e = SmartPhoneticEngine(languageModel: Self.phraseLM)
+        // type ㄐㄧㄣ (r,u,p, space) then ㄊㄧㄢ (w,u,0, space)
+        for k in ["r","u","p"," ","w","u","0"," "] { _ = e.handleKey(Character(k)) }
+        XCTAssertEqual(e.composingText, "今天")            // phrase wins by default
+        // candidates at the last position include 天/田 (and the phrase); pick 田
+        let i = e.candidates.firstIndex(of: "田")
+        XCTAssertNotNil(i)
+        e.selectCandidate(i!)
+        XCTAssertEqual(e.composingText, "今田")            // selection applied despite phrase walk
+    }
 }
