@@ -29,6 +29,21 @@ final class InputController: IMKInputController {
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard let event, event.type == .keyDown, let client = sender as? IMKTextInput else { return false }
 
+        // Selection mode (entered via Down): digits pick a candidate; Esc just closes the
+        // picker and keeps the composition; any other key resumes normal composing.
+        if selecting {
+            if event.keyCode == 53 { // Escape exits selection without discarding composition
+                selecting = false; refresh(client); return true
+            }
+            if let chars = event.characters, let d = Int(chars), (1...9).contains(d),
+               d - 1 < engine.candidates.count {
+                engine.selectCandidate(d - 1)
+                selecting = false
+                return commitCurrent(to: client)
+            }
+            selecting = false   // fall through to normal composing below
+        }
+
         // Enter commits; Backspace deletes; Esc cancels; Down opens selection; mapped keys feed the engine.
         switch event.keyCode {
         case 36: // Return
@@ -37,26 +52,13 @@ final class InputController: IMKInputController {
         case 51: // Delete/Backspace
             guard !engine.composingText.isEmpty else { return false }
             engine.backspace(); refresh(client); return true
-        case 53: // Escape
+        case 53: // Escape cancels composition (commit-then-discard)
             guard !engine.composingText.isEmpty else { return false }
-            selecting = false
-            _ = engine.commit(); refresh(client); return true // cancel composition (commit-then-discard)
+            _ = engine.commit(); refresh(client); return true
         case 125: // Down arrow opens candidate selection
             guard !engine.composingText.isEmpty, !engine.candidates.isEmpty else { return false }
             selecting = true; refresh(client); return true
         default: break
-        }
-
-        if selecting {
-            if let chars = event.characters, let d = Int(chars), (1...9).contains(d),
-               d - 1 < engine.candidates.count {
-                engine.selectCandidate(d - 1)
-                selecting = false
-                return commitCurrent(to: client)
-            }
-            if event.keyCode == 53 { selecting = false; refresh(client); return true } // Esc exits selection
-            // any other key: leave selection mode and fall through to normal composing
-            selecting = false
         }
 
         guard let ch = event.characters?.first else { return false }
