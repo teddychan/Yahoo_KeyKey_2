@@ -1,0 +1,30 @@
+Cangjie (倉頡) data table — source and license
+================================================
+
+File:    Resources/cangjie.txt
+Content: Cangjie 5th Generation (倉頡第五代) code -> single Han character mapping.
+Format:  Converted to "<code>\t<char>" per line. The upstream frequency column
+         (a trailing "\t<freq>") was dropped; rows are otherwise verbatim.
+
+Source repository
+-----------------
+definite/ibus-table-chinese
+  https://github.com/definite/ibus-table-chinese
+  File: tables/cangjie/cangjie5.txt
+  Raw:  https://raw.githubusercontent.com/definite/ibus-table-chinese/master/tables/cangjie/cangjie5.txt
+
+Upstream data origin / attribution
+-----------------------------------
+CangJie Input Method the 5th Generation (2008 Latest Edition)
+Source of Software : chinesecj.com (倉頡之友‧馬來西亞)
+Retrieved from     : http://www.chinesecj.com/newsoftware/index3.php?Type=1
+Author             : chinesecj.com (倉頡之友‧馬來西亞)
+
+License (as declared in the upstream table file header)
+-------------------------------------------------------
+LICENSE = Freely redistributable without restriction
+
+Note: the individual table file declares itself "Freely redistributable
+without restriction" (a permissive, non-copyleft term). The surrounding
+ibus-table-chinese repository packaging is GPLv3; only the data table itself
+is reused here, under the table's own freely-redistributable declaration.

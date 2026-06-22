@@ -44,7 +44,7 @@ swiftc \
   -swift-version 5 \
   -I "$MODULE_DIR" -L "$MODULE_DIR" -lKeyKeyEngine \
   -framework InputMethodKit -framework Cocoa \
-  "$APP_SRC"/main.swift "$APP_SRC"/InputController.swift "$APP_SRC"/CandidateWindow.swift
+  "$APP_SRC"/main.swift "$APP_SRC"/InputController.swift "$APP_SRC"/InputEngine.swift "$APP_SRC"/CandidateWindow.swift
 
 echo "==> Assembling Info.plist (resolving \${EXECUTABLE_NAME})"
 sed "s/\${EXECUTABLE_NAME}/$EXECUTABLE_NAME/g" "$APP_SRC/Info.plist" > "$APP/Contents/Info.plist"
@@ -56,6 +56,18 @@ if [ ! -f "$ROOT/Resources/data.txt" ]; then
   exit 1
 fi
 cp "$ROOT/Resources/data.txt" "$APP/Contents/Resources/data.txt"
+
+echo "==> Copying bundled Cangjie table (cangjie.txt)"
+if [ ! -f "$ROOT/Resources/cangjie.txt" ]; then
+  echo "ERROR: Resources/cangjie.txt missing" >&2
+  exit 1
+fi
+cp "$ROOT/Resources/cangjie.txt" "$APP/Contents/Resources/cangjie.txt"
+
+echo "==> Copying localized strings (.lproj)"
+for lproj in "$APP_SRC"/*.lproj; do
+  [ -d "$lproj" ] && cp -R "$lproj" "$APP/Contents/Resources/"
+done
 
 echo "==> Ad-hoc code-signing the bundle"
 codesign --force --deep -s - "$APP"
