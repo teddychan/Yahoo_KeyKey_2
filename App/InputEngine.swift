@@ -29,6 +29,9 @@ extension SmartPhoneticEngine: InputEngine {}
 // commit() emits it, so a direct digit-select followed by commit() works.
 extension CangjieEngine: InputEngine {}
 
+// SimplexEngine mirrors the CangjieEngine surface exactly (direct digit-select then commit()).
+extension SimplexEngine: InputEngine {}
+
 // PlainPhoneticEngine differs: its selectCandidate(_:) returns the chosen single
 // character AND resets the engine, so a follow-up commit() would yield nothing.
 // This thin adapter captures the selection so commit() returns it instead.
