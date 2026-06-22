@@ -233,8 +233,12 @@ final class InputController: IMKInputController {
         client.setMarkedText(composing,
                              selectionRange: NSRange(location: composing.utf16.count, length: 0),
                              replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
+        // Only show the numbered candidate window when number keys actually select:
+        // in `selecting` mode (Smart/Plain, after Down) or for Cangjie (direct digit-select).
+        // Otherwise the list would imply number-select while digits are still Bopomofo input.
         let cands = engine.candidates
-        if cands.isEmpty { candidateWindow.hide() }
+        let numbersSelect = selecting || method.usesDirectDigitSelect
+        if cands.isEmpty || !numbersSelect { candidateWindow.hide() }
         else {
             var rect = NSRect.zero
             client.attributes(forCharacterIndex: 0, lineHeightRectangle: &rect)
