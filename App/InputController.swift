@@ -136,7 +136,7 @@ final class InputController: IMKInputController {
         let choice = InputMethodChoice(modeID: modeID)
         guard choice != method else { return }
         // Commit any in-progress composition so the rebuilt engine starts clean.
-        if let client = sender as? IMKTextInput ?? client() as? IMKTextInput {
+        if let client = sender as? IMKTextInput ?? client() {
             _ = commitCurrent(to: client)
         } else {
             _ = engine.commit()
@@ -201,13 +201,13 @@ final class InputController: IMKInputController {
             }
             if event.keyCode == 49 { // Space confirms the current/top candidate
                 if !engine.candidates.isEmpty { engine.selectCandidate(0) }
-                return commitCurrent(to: client)
+                return commitCurrent(to: client, offerAssociations: true)
             }
             if let chars = event.characters, let d = Int(chars), (1...9).contains(d),
                d - 1 < engine.candidates.count {
                 engine.selectCandidate(d - 1)
                 selecting = false
-                return commitCurrent(to: client)
+                return commitCurrent(to: client, offerAssociations: true)
             }
             selecting = false   // fall through to normal composing below
         }
@@ -232,7 +232,7 @@ final class InputController: IMKInputController {
                 let index = candidatePage * InputController.pageSize + (d - 1)
                 if index < count {
                     engine.selectCandidate(index)
-                    return commitCurrent(to: client)
+                    return commitCurrent(to: client, offerAssociations: true)
                 }
                 return true // digit beyond this page's candidates: swallow, no insert
             }
@@ -246,15 +246,15 @@ final class InputController: IMKInputController {
                 // fall through to engine.handleKey(" ") below to finalize as tone 1
             } else if !engine.composingText.isEmpty {
                 if method == .smartPhonetic {
-                    return commitCurrent(to: client)
+                    return commitCurrent(to: client, offerAssociations: true)
                 } else if method.usesDirectDigitSelect { // .cangjie / .simplex: commit first of current page
                     if !engine.candidates.isEmpty {
                         engine.selectCandidate(candidatePage * InputController.pageSize)
                     }
-                    return commitCurrent(to: client)
+                    return commitCurrent(to: client, offerAssociations: true)
                 } else { // .plainPhonetic: commit the top candidate
                     if !engine.candidates.isEmpty { engine.selectCandidate(0) }
-                    return commitCurrent(to: client)
+                    return commitCurrent(to: client, offerAssociations: true)
                 }
             } else {
                 return false // nothing composing: pass a literal space to the app
@@ -269,7 +269,7 @@ final class InputController: IMKInputController {
             if method.usesDirectDigitSelect, !engine.candidates.isEmpty {
                 engine.selectCandidate(candidatePage * InputController.pageSize)
             }
-            return commitCurrent(to: client)
+            return commitCurrent(to: client, offerAssociations: true)
         case 51: // Delete/Backspace
             guard !engine.composingText.isEmpty else { return false }
             engine.backspace(); candidatePage = 0; refresh(client); return true
@@ -301,7 +301,7 @@ final class InputController: IMKInputController {
     }
 
     @discardableResult
-    private func commitCurrent(to client: IMKTextInput) -> Bool {
+    private func commitCurrent(to client: IMKTextInput, offerAssociations: Bool = false) -> Bool {
         selecting = false
         candidatePage = 0
         let text = engine.commit()
@@ -310,9 +310,9 @@ final class InputController: IMKInputController {
         }
         client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0),
                              replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
-        // After committing a single character, offer associated phrases (聯想). For longer
-        // commits (phrases) or empty commits, just hide the candidate window.
-        if text.count == 1, let first = text.first {
+        // After an explicit user commit of a single character, offer associated phrases (聯想).
+        // System-driven commits (focus loss, mode switch) pass offerAssociations: false and stay idle.
+        if offerAssociations, text.count == 1, let first = text.first {
             let phrases = associatedPhrases.associations(for: first)
             if !phrases.isEmpty {
                 associations = phrases
@@ -321,6 +321,7 @@ final class InputController: IMKInputController {
                 return true
             }
         }
+        associations = []
         candidateWindow.hide()
         return true
     }
@@ -347,6 +348,8 @@ final class InputController: IMKInputController {
         else {
             let size = InputController.pageSize
             let pageCount = (cands.count + size - 1) / size
+            // Guard against a stale candidatePage pointing past the end (would trap on slice).
+            if candidatePage * size >= cands.count { candidatePage = 0 }
             let start = candidatePage * size
             let page = Array(cands[start..<min(start + size, cands.count)])
             var rect = NSRect.zero
