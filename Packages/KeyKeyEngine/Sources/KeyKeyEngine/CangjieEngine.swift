@@ -22,9 +22,10 @@ public final class CangjieEngine {
     }
 
     /// Returns true if the key was consumed by the engine.
+    /// Accepts a–z radical keys and `*` (wildcard for one-or-more unknown radicals).
     @discardableResult
     public func handleKey(_ key: Character) -> Bool {
-        guard Self.radicals[key] != nil else { return false }
+        guard Self.radicals[key] != nil || key == "*" else { return false }
         guard code.count < Self.maxRadicals else { return true }
         code.append(key)
         selected = nil
@@ -34,15 +35,15 @@ public final class CangjieEngine {
     /// Cangjie has no tone concept, so it never holds a tone-pending syllable.
     public var isComposingSyllable: Bool { false }
 
-    /// The 倉頡 radical glyphs accumulated so far, e.g. "日月".
+    /// The 倉頡 radical glyphs accumulated so far, e.g. "日月". `*` is shown literally.
     public var composingText: String {
         if let selected { return selected }
-        return String(code.compactMap { Self.radicals[$0] })
+        return String(code.map { Self.radicals[$0] ?? $0 })
     }
 
-    /// Characters whose code equals the current radical sequence.
+    /// Characters whose code matches the current radical sequence (supports `*`).
     public var candidates: [String] {
-        code.isEmpty ? [] : table.characters(forCode: code)
+        code.isEmpty ? [] : table.characters(matching: code)
     }
 
     public func selectCandidate(_ index: Int) {
@@ -58,7 +59,7 @@ public final class CangjieEngine {
 
     @discardableResult
     public func commit() -> String {
-        let text = composingText
+        let text = selected ?? candidates.first ?? ""
         code = ""
         selected = nil
         return text

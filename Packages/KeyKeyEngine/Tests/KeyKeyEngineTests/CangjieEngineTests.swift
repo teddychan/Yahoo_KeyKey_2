@@ -56,10 +56,18 @@ final class CangjieEngineTests: XCTestCase {
         XCTAssertEqual(e.candidates, [])
     }
 
-    func testCommitWithoutSelectionUsesRadicalGlyphs() {
+    func testCommitWithoutSelectionUsesFirstCandidate() {
         let e = make()
-        _ = e.handleKey("a"); _ = e.handleKey("b"); _ = e.handleKey("c")
-        XCTAssertEqual(e.commit(), "日月金")
+        _ = e.handleKey("a"); _ = e.handleKey("b")
+        XCTAssertEqual(e.commit(), "明")   // first candidate for "ab", not the radicals
+        XCTAssertEqual(e.composingText, "")
+    }
+
+    func testCommitWithNoMatchEmitsNothing() {
+        let e = make()
+        _ = e.handleKey("c")   // no code "c" in the fixture
+        XCTAssertEqual(e.commit(), "")
+        XCTAssertEqual(e.composingText, "")
     }
 
     func testBackspaceRemovesLastRadical() {
@@ -98,6 +106,33 @@ final class CangjieEngineTests: XCTestCase {
         XCTAssertFalse(e.handleKey(" "))
         XCTAssertFalse(e.handleKey("A"))   // uppercase is not a radical key
         XCTAssertEqual(e.composingText, "日")
+    }
+
+    func testWildcardIsConsumedAndShownLiterally() {
+        let e = make()
+        _ = e.handleKey("a")
+        XCTAssertTrue(e.handleKey("*"))
+        XCTAssertEqual(e.composingText, "日*")   // * rendered literally
+    }
+
+    func testWildcardCandidatesMatchPattern() {
+        let e = make()
+        _ = e.handleKey("a"); _ = e.handleKey("*")
+        // "a*" matches "ab","abc","abcde","abcdef" (≥1 letter after a)
+        XCTAssertEqual(e.candidates, ["明", "冒", "韻", "漏"])
+    }
+
+    func testWildcardBetweenLiterals() {
+        let e = make()
+        _ = e.handleKey("a"); _ = e.handleKey("*"); _ = e.handleKey("b")
+        // "a*b" matches codes starting a, ending b, ≥1 between: "ab" is too short? ab=a,b no middle
+        XCTAssertEqual(e.candidates, [])
+    }
+
+    func testWildcardCountsTowardMaxLength() {
+        let e = make()
+        for _ in 0..<6 { _ = e.handleKey("*") }
+        XCTAssertEqual(e.composingText, "*****")   // capped at 5
     }
 
     func testRadicalMapCoversFullAlphabet() {

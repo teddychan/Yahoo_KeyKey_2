@@ -22,4 +22,26 @@ public struct CangjieTable {
 
     public func characters(forCode code: String) -> [String] { table[code] ?? [] }
     public func hasCode(_ code: String) -> Bool { table[code] != nil }
+
+    /// Iterates every (code, characters) entry in insertion-independent order.
+    public func forEachEntry(_ body: (String, [String]) -> Void) {
+        for (code, chars) in table { body(code, chars) }
+    }
+
+    /// Returns characters whose code matches `pattern`. `*` matches one-or-more
+    /// letters (a–z); other characters match literally. With no `*`, behaves like
+    /// an exact `characters(forCode:)`. Results are ordered by matched code length
+    /// then the table's character order for that code (deterministic).
+    public func characters(matching pattern: String) -> [String] {
+        guard pattern.contains("*") else { return characters(forCode: pattern) }
+        let regex = "^" + pattern.split(separator: "*", omittingEmptySubsequences: false)
+            .map { NSRegularExpression.escapedPattern(for: String($0)) }
+            .joined(separator: "[a-z]+") + "$"
+        guard let re = try? NSRegularExpression(pattern: regex) else { return [] }
+        let matched = table.keys.filter {
+            re.firstMatch(in: $0, range: NSRange($0.startIndex..., in: $0)) != nil
+        }
+        return matched.sorted { ($0.count, $0) < ($1.count, $1) }
+            .flatMap { table[$0] ?? [] }
+    }
 }

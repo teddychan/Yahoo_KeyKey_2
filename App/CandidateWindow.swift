@@ -25,10 +25,13 @@ final class CandidateWindow {
         panel.contentView = content
     }
 
-    func show(_ candidates: [String], near point: NSPoint) {
-        let shown = candidates.prefix(9).enumerated()
+    // `pageCandidates` is the already-sliced set for the current page (≤9). When `pageCount`
+    // exceeds 1, a " (page/total)" indicator is appended.
+    func show(_ pageCandidates: [String], page: Int, pageCount: Int, near point: NSPoint) {
+        var shown = pageCandidates.prefix(9).enumerated()
             .map { "\($0.offset + 1).\($0.element)" }
             .joined(separator: "  ")
+        if pageCount > 1 { shown += "  (\(page + 1)/\(pageCount))" }
         label.stringValue = shown
         panel.setContentSize(label.intrinsicContentSize)
         panel.setFrameTopLeftPoint(NSPoint(x: point.x, y: point.y - 4))
