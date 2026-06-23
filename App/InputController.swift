@@ -103,8 +103,11 @@ final class InputController: IMKInputController {
             methodItems.forEach(menu.addItem)
         }
 
-        // 3. About (settings live as the toggles above; no separate Preferences window).
+        // 3. Check for updates + About (stateless "open" actions).
         menu.addItem(.separator())
+        let update = NSMenuItem(title: "檢查更新…", action: #selector(checkForUpdates), keyEquivalent: "")
+        update.target = self
+        menu.addItem(update)
         let about = NSMenuItem(title: "關於 Yahoo KeyKey 2…", action: #selector(openAbout), keyEquivalent: "")
         about.target = self
         menu.addItem(about)
@@ -121,6 +124,10 @@ final class InputController: IMKInputController {
 
     @objc private func toggleSimplified() {
         Preferences.outputSimplifiedEnabled.toggle()
+    }
+
+    @objc private func checkForUpdates() {
+        Updater.shared.checkForUpdates()
     }
 
     @objc private func openAbout() {
