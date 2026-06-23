@@ -2,20 +2,6 @@ import Cocoa
 import InputMethodKit
 import KeyKeyEngine
 
-// The input method, selected by the user as an IMK input MODE (see Info.plist
-// ComponentInputModeDict). IMK delivers the selection via setValue(_:forTag:client:).
-private enum InputMethodChoice: String {
-    case cangjie
-    case simplex
-
-    // Map an IMK input-mode identifier (…YahooKeyKey2.Cangjie etc.) to a method.
-    // The product exposes only Cangjie and Simplex; default to Cangjie.
-    init(modeID: String) {
-        if modeID.hasSuffix(".Simplex") { self = .simplex }
-        else { self = .cangjie }
-    }
-}
-
 @objc(InputController)
 final class InputController: IMKInputController {
     private let lm: LanguageModel
@@ -28,7 +14,11 @@ final class InputController: IMKInputController {
     private let simplexTable: SimplexTable
     // Traditional→Simplified character converter, applied only when Preferences.outputSimplifiedEnabled.
     private let hanConvertFilter: HanConvertFilter
-    private var method: InputMethodChoice = .cangjie
+    // Registry of available input methods (the first is the default). Adding a method is a
+    // one-place change here plus an Info.plist input mode — see InputMethodModule.
+    private let modules: [InputMethodModule]
+    // The active module; selected by Info.plist mode id via setValue(_:forTag:client:).
+    private var currentModule: InputMethodModule
     private var engine: InputEngine
     private let candidateWindow = CandidateWindow()
     // Current candidate page (9 per page) for the active composition; reused for association paging.
@@ -98,56 +88,82 @@ final class InputController: IMKInputController {
         let userFreq = UserFrequency()
         self.userFreq = userFreq
 
-        // Start on Cangjie; IMK calls setValue(_:forTag:client:) with the active input mode
-        // (and on every mode switch), which rebuilds the engine accordingly.
-        self.engine = InputController.makeEngine(method: .cangjie,
-                                                 characterRank: characterRank,
-                                                 userFreq: userFreq,
-                                                 cangjieTable: cangjieTable,
-                                                 simplexTable: simplexTable)
-        super.init(server: server, delegate: delegate, client: inputClient)
-    }
-
-    // Build the engine for the active method (Cangjie or Simplex).
-    private static func makeEngine(method: InputMethodChoice,
-                                   characterRank: [Character: Double],
-                                   userFreq: UserFrequency,
-                                   cangjieTable: CangjieTable,
-                                   simplexTable: SimplexTable) -> InputEngine {
         // Live user-learning bonus; the closure consults the store on every sort, so a
         // freshly-committed character promotes without rebuilding the engine.
         let userRank: (Character) -> Double = { [userFreq] in userFreq.bonus(for: $0) }
-        switch method {
-        case .cangjie:
-            return CangjieEngine(table: cangjieTable, characterRank: characterRank, userRank: userRank)
-        case .simplex:
-            return SimplexEngine(table: simplexTable, characterRank: characterRank, userRank: userRank)
-        }
+
+        // The input-method registry. Each module's makeEngine captures the shared tables/ranks.
+        // To add a method: append a module here and an Info.plist input mode — nothing else.
+        let modules = [
+            InputMethodModule(modeSuffix: "Cangjie", displayName: "倉頡") {
+                CangjieEngine(table: cangjieTable, characterRank: characterRank, userRank: userRank)
+            },
+            InputMethodModule(modeSuffix: "Simplex", displayName: "速成") {
+                SimplexEngine(table: simplexTable, characterRank: characterRank, userRank: userRank)
+            },
+        ]
+        self.modules = modules
+
+        // Start on the default (first) module; IMK calls setValue(_:forTag:client:) with the
+        // active input mode (and on every mode switch), which rebuilds the engine accordingly.
+        self.currentModule = modules[0]
+        self.engine = modules[0].makeEngine()
+        super.init(server: server, delegate: delegate, client: inputClient)
     }
 
     override func recognizedEvents(_ sender: Any!) -> Int {
         Int(NSEvent.EventTypeMask.keyDown.rawValue)
     }
 
-    // IMK input-menu (the menu shown in the input-method menu-bar item). A single
-    // "Preferences…" item opens the SHARED Preferences window — a stateless "open window"
-    // action, independent of which controller instance receives it.
+    // IMK input-menu (the menu shown in the input-method menu-bar item), grouped to
+    // mirror the original Yahoo! KeyKey settings layout:
+    //   1. general toggles (聯想字詞 / 全形標點 / 輸出簡體字), checkmarks reflect live prefs;
+    //   2. any settings specific to the active input method (none for Cangjie/Simplex today);
+    //   3. 偏好設定… and 關於… (stateless "open window" actions, shared windows).
     override func menu() -> NSMenu! {
         let menu = NSMenu()
-        // Quick toggle: convert committed output Traditional -> Simplified. Check reflects state.
+
+        // 1. General toggles. Each flips its Preferences value live; checkmark reflects state.
+        let associate = NSMenuItem(title: "聯想字詞", action: #selector(toggleAssociated), keyEquivalent: "")
+        associate.target = self
+        associate.state = Preferences.associatedPhrasesEnabled ? .on : .off
+        menu.addItem(associate)
+
+        let fullWidth = NSMenuItem(title: "全形標點", action: #selector(toggleFullWidth), keyEquivalent: "")
+        fullWidth.target = self
+        fullWidth.state = Preferences.fullWidthPunctuationEnabled ? .on : .off
+        menu.addItem(fullWidth)
+
         let convert = NSMenuItem(title: "輸出簡體字", action: #selector(toggleSimplified), keyEquivalent: "")
         convert.target = self
         convert.state = Preferences.outputSimplifiedEnabled ? .on : .off
         menu.addItem(convert)
+
+        // 2. Settings specific to the active input method (grouped with their method).
+        // Empty for Cangjie/Simplex today; future methods supply items via methodMenuItems.
+        let methodItems = currentModule.methodMenuItems()
+        if !methodItems.isEmpty {
+            menu.addItem(.separator())
+            methodItems.forEach(menu.addItem)
+        }
+
+        // 3. Preferences and About.
         menu.addItem(.separator())
-        let item = NSMenuItem(title: "偏好設定…", action: #selector(openPreferences), keyEquivalent: "")
-        item.target = self
-        menu.addItem(item)
-        menu.addItem(.separator())
+        let prefs = NSMenuItem(title: "偏好設定…", action: #selector(openPreferences), keyEquivalent: "")
+        prefs.target = self
+        menu.addItem(prefs)
         let about = NSMenuItem(title: "關於 Yahoo KeyKey 2…", action: #selector(openAbout), keyEquivalent: "")
         about.target = self
         menu.addItem(about)
         return menu
+    }
+
+    @objc private func toggleAssociated() {
+        Preferences.associatedPhrasesEnabled.toggle()
+    }
+
+    @objc private func toggleFullWidth() {
+        Preferences.fullWidthPunctuationEnabled.toggle()
     }
 
     @objc private func toggleSimplified() {
@@ -166,8 +182,9 @@ final class InputController: IMKInputController {
     // ComponentInputModeDict). The value is the mode identifier string.
     override func setValue(_ value: Any!, forTag tag: Int, client sender: Any!) {
         let modeID = value as? String ?? ""
-        let choice = InputMethodChoice(modeID: modeID)
-        guard choice != method else { return }
+        // Look up the module whose suffix matches the IMK mode id; default to the first.
+        let module = modules.first { modeID.hasSuffix(".\($0.modeSuffix)") } ?? modules[0]
+        guard module.modeSuffix != currentModule.modeSuffix else { return }
         // Commit any in-progress composition so the rebuilt engine starts clean.
         if let client = sender as? IMKTextInput ?? client() {
             _ = commitCurrent(to: client)
@@ -177,10 +194,8 @@ final class InputController: IMKInputController {
         candidatePage = 0
         associations = []
         candidateWindow.hide()
-        method = choice
-        engine = InputController.makeEngine(method: choice,
-                                            characterRank: characterRank, userFreq: userFreq,
-                                            cangjieTable: cangjieTable, simplexTable: simplexTable)
+        currentModule = module
+        engine = module.makeEngine()
     }
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
