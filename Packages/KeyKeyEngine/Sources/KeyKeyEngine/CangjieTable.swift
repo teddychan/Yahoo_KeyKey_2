@@ -24,9 +24,22 @@ public struct CangjieTable {
             if line.isEmpty || line.hasPrefix("#") { continue }
             let parts = line.split(separator: "\t")
             guard parts.count >= 2 else { continue }
+            let char = String(parts[1])
+            guard let ch = char.first, char.count == 1, Self.isRenderableCJK(ch) else { continue }
             let code = String(parts[0])
-            table[code, default: []].append(String(parts[1]))
+            table[code, default: []].append(char)
         }
+    }
+
+    /// True only for single-scalar characters in the commonly-renderable CJK ranges.
+    /// Drops Private Use Areas and supplementary-plane ideographs (Ext-B and beyond),
+    /// which render as tofu/`[?]` on most systems.
+    static func isRenderableCJK(_ ch: Character) -> Bool {
+        let scalars = ch.unicodeScalars
+        guard scalars.count == 1, let v = scalars.first?.value else { return false }
+        return (0x4E00...0x9FFF).contains(v)   // CJK Unified Ideographs
+            || (0x3400...0x4DBF).contains(v)   // CJK Extension A
+            || (0xF900...0xFAFF).contains(v)   // CJK Compatibility Ideographs
     }
 
     public init(contentsOf url: URL) throws {

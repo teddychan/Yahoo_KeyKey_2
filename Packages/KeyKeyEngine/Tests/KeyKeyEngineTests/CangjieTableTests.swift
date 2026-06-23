@@ -61,4 +61,45 @@ final class CangjieTableTests: XCTestCase {
         Self.wildcardTable.forEachEntry { _, chars in count += chars.count }
         XCTAssertEqual(count, 5)
     }
+
+    // Fixture mixing renderable common CJK with tofu offenders:
+    //   日   U+65E5  BMP CJK Unified           -> kept
+    //   䫻   U+4AFB  CJK Extension A           -> kept
+    //   U+E81C       Private Use Area          -> dropped (always tofu)
+    //   𣇘   U+231D8 CJK Extension B (plane 2) -> dropped (no glyph on most systems)
+    static let tofuTable = CangjieTable(text: """
+    a\t日
+    b\t䫻
+    c\t\u{E81C}
+    d\t𣇘
+    """)
+
+    func testKeepsBMPAndExtACharacters() {
+        XCTAssertEqual(Self.tofuTable.characters(forCode: "a"), ["日"])
+        XCTAssertEqual(Self.tofuTable.characters(forCode: "b"), ["䫻"])
+    }
+
+    func testDropsPrivateUseAreaCharacter() {
+        XCTAssertEqual(Self.tofuTable.characters(forCode: "c"), [])
+        XCTAssertFalse(Self.tofuTable.hasCode("c"))
+    }
+
+    func testDropsSupplementaryPlaneExtBCharacter() {
+        XCTAssertEqual(Self.tofuTable.characters(forCode: "d"), [])
+        XCTAssertFalse(Self.tofuTable.hasCode("d"))
+    }
+
+    func testFilteredCharactersExcludedFromWildcardMatch() {
+        // "*" should never surface dropped tofu characters.
+        XCTAssertEqual(Self.tofuTable.characters(matching: "*"), ["日", "䫻"])
+    }
+
+    func testSimplexInheritsFilterFromCangjie() {
+        // SimplexTable derived from a CangjieTable sees only filtered entries.
+        let simplex = SimplexTable(cangjie: Self.tofuTable)
+        XCTAssertEqual(simplex.characters(forCode: "a"), ["日"])
+        XCTAssertEqual(simplex.characters(forCode: "b"), ["䫻"])
+        XCTAssertEqual(simplex.characters(forCode: "c"), [])
+        XCTAssertEqual(simplex.characters(forCode: "d"), [])
+    }
 }
