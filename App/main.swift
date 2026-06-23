@@ -14,4 +14,6 @@ if server == nil { NSLog("YahooKeyKey: failed to create IMKServer"); exit(EXIT_F
 // Prewarm the shared resources off the main thread during IMK startup so the one-time
 // data.txt parse happens before the first controller is created (later inits are instant).
 DispatchQueue.global(qos: .userInitiated).async { _ = SharedResources.shared }
+// Start Sparkle auto-update (no-op on builds without SUPublicEDKey).
+_ = Updater.shared
 NSApplication.shared.run()
