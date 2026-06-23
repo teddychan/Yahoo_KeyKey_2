@@ -1,10 +1,10 @@
 import Cocoa
 
 // Borderless candidate list styled after the classic Yahoo! KeyKey picker: a rounded, bordered
-// box with a "SHIFT + NUM" header, numbered two-column rows (1..9), and a "▼ page/total" footer.
-// Display only — selection is by number key. Colours follow the system appearance (dark box in
-// dark mode, light box in light mode); the geometry (border, spacing, font sizes) is mapped from
-// the original app and scales with the live candidate font-size preference.
+// box with numbered two-column rows (1..9) and a "▼ page/total" footer. Display only — selection
+// is by number key. Colours follow the system appearance (dark box in dark mode, light box in
+// light mode); the geometry (border, spacing, font sizes) is mapped from the original app and
+// scales with the live candidate font-size preference.
 final class CandidateWindow {
     // Geometry mapped from the original app. Sizes that must track the candidate glyph are derived
     // from `fontSize` so the live font-size preference keeps the whole box proportional.
@@ -24,12 +24,8 @@ final class CandidateWindow {
     private let panel: NSPanel
     private let content = NSView()
     private let stack = NSStackView()
-    private let headerRow = NSView()
-    private let headerArrow = NSTextField(labelWithString: "▲")
-    private let headerTitle = NSTextField(labelWithString: "SHIFT + NUM")
-    private let div1 = NSBox()
     private let candLabel = NSTextField(labelWithString: "")
-    private let div2 = NSBox()
+    private let divider = NSBox()
     private let footerRow = NSView()
     private let footerArrow = NSTextField(labelWithString: "▼")
     private let pageLabel = NSTextField(labelWithString: "")
@@ -51,19 +47,15 @@ final class CandidateWindow {
         content.layer?.masksToBounds = true
 
         candLabel.maximumNumberOfLines = 0
-        // Let the box widen to whichever row is widest (header vs candidate list vs footer): the
-        // candidate label hugs its text only weakly, so the equal-width constraints below resolve
-        // every row to the common maximum instead of clipping the header.
+        // Let the box widen to whichever row is widest (candidate list vs footer): the candidate
+        // label hugs its text only weakly, so the equal-width constraints below resolve both rows
+        // to the common maximum.
         candLabel.setContentHuggingPriority(.defaultHigh, for: .horizontal)
-        headerTitle.setContentHuggingPriority(.required, for: .horizontal)
 
-        configureChrome(headerArrow)
-        configureChrome(headerTitle)
         configureChrome(footerArrow)
         configureChrome(pageLabel)
-        for box in [div1, div2] { box.boxType = .separator }
+        divider.boxType = .separator
 
-        layoutChromeRow(headerRow, arrow: headerArrow, title: headerTitle)
         layoutChromeRow(footerRow, arrow: footerArrow, title: pageLabel)
 
         stack.orientation = .vertical
@@ -72,7 +64,7 @@ final class CandidateWindow {
         stack.edgeInsets = NSEdgeInsets(top: Style.insetV, left: Style.insetH,
                                         bottom: Style.insetV, right: Style.insetH)
         stack.translatesAutoresizingMaskIntoConstraints = false
-        for v in [headerRow, div1, candLabel, div2, footerRow] { stack.addArrangedSubview(v) }
+        for v in [candLabel, divider, footerRow] { stack.addArrangedSubview(v) }
 
         content.addSubview(stack)
         NSLayoutConstraint.activate([
@@ -80,11 +72,9 @@ final class CandidateWindow {
             stack.trailingAnchor.constraint(equalTo: content.trailingAnchor),
             stack.topAnchor.constraint(equalTo: content.topAnchor),
             stack.bottomAnchor.constraint(equalTo: content.bottomAnchor),
-            // All full-width rows match the candidate column; equal (not one-directional) so the
+            // Full-width rows match the candidate column; equal (not one-directional) so the
             // common width is the max of every row's intrinsic width.
-            div1.widthAnchor.constraint(equalTo: candLabel.widthAnchor),
-            div2.widthAnchor.constraint(equalTo: candLabel.widthAnchor),
-            headerRow.widthAnchor.constraint(equalTo: candLabel.widthAnchor),
+            divider.widthAnchor.constraint(equalTo: candLabel.widthAnchor),
             footerRow.widthAnchor.constraint(equalTo: candLabel.widthAnchor),
         ])
         panel.contentView = content
@@ -118,7 +108,7 @@ final class CandidateWindow {
         let glyphFont = NSFont.systemFont(ofSize: fontSize)
         let numFont = NSFont.monospacedDigitSystemFont(ofSize: Style.numberSize(fontSize), weight: .regular)
         let chromeFont = NSFont.systemFont(ofSize: Style.chromeSize(fontSize), weight: .medium)
-        for f in [headerArrow, headerTitle, footerArrow, pageLabel] { f.font = chromeFont }
+        for f in [footerArrow, pageLabel] { f.font = chromeFont }
 
         let para = NSMutableParagraphStyle()
         para.tabStops = [NSTextTab(textAlignment: .left, location: Style.numberColumn(fontSize))]
