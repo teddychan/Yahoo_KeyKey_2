@@ -177,6 +177,10 @@ final class InputController: IMKInputController {
         let item = NSMenuItem(title: "偏好設定…", action: #selector(openPreferences), keyEquivalent: "")
         item.target = self
         menu.addItem(item)
+        menu.addItem(.separator())
+        let about = NSMenuItem(title: "關於 Yahoo KeyKey 2…", action: #selector(openAbout), keyEquivalent: "")
+        about.target = self
+        menu.addItem(about)
         return menu
     }
 
@@ -186,6 +190,10 @@ final class InputController: IMKInputController {
 
     @objc private func openPreferences() {
         PreferencesWindowController.shared.show()
+    }
+
+    @objc private func openAbout() {
+        AboutWindowController.shared.show()
     }
 
     // IMK calls this when the user selects one of our input modes (Info.plist
