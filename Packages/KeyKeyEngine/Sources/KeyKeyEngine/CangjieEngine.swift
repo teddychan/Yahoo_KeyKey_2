@@ -1,5 +1,5 @@
 // Cangjie (倉頡) engine: accumulate up to 5 radical letter keys (a–z), look up the
-// matching characters in the table, then select/commit. Mirrors the SmartPhoneticEngine
+// matching characters in the table, then select/commit. Exposes the engine
 // surface (handleKey/composingText/candidates/selectCandidate/commit/backspace).
 public final class CangjieEngine {
     // a–z -> the 倉頡 radical glyph it represents, for the composing display.

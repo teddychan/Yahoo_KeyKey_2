@@ -1,6 +1,6 @@
 import KeyKeyEngine
 
-// App-internal driving surface shared by all three input methods. The IMK
+// App-internal driving surface shared by both input methods. The IMK
 // controller's handle() talks to engines only through this protocol; behaviour
 // that genuinely differs between methods is branched in handle(), not hidden here.
 //
@@ -21,53 +21,9 @@ protocol InputEngine: AnyObject {
     func commit() -> String
 }
 
-// SmartPhoneticEngine already exposes the exact protocol surface (phrase/Viterbi
-// engine; selection is Down-then-digit, then commit() emits the whole phrase).
-extension SmartPhoneticEngine: InputEngine {}
-
-// CangjieEngine already matches too: selectCandidate sets the chosen glyph and
+// CangjieEngine matches the protocol surface: selectCandidate sets the chosen glyph and
 // commit() emits it, so a direct digit-select followed by commit() works.
 extension CangjieEngine: InputEngine {}
 
 // SimplexEngine mirrors the CangjieEngine surface exactly (direct digit-select then commit()).
 extension SimplexEngine: InputEngine {}
-
-// PlainPhoneticEngine differs: its selectCandidate(_:) returns the chosen single
-// character AND resets the engine, so a follow-up commit() would yield nothing.
-// This thin adapter captures the selection so commit() returns it instead.
-final class PlainPhoneticEngineAdapter: InputEngine {
-    private let engine: PlainPhoneticEngine
-    private var pendingSelection: String?
-
-    init(_ engine: PlainPhoneticEngine) { self.engine = engine }
-
-    func handleKey(_ key: Character) -> Bool { engine.handleKey(key) }
-
-    var composingText: String { pendingSelection ?? engine.composingText }
-
-    // A held selection is already finalized, so it is never a tone-pending syllable.
-    var isComposingSyllable: Bool { pendingSelection == nil ? engine.isComposingSyllable : false }
-
-    // Once a selection is pending, the composition is effectively finalized: report no
-    // candidates so composingText (= pendingSelection) and candidates stay consistent if
-    // the IMK loop reads them before commit().
-    var candidates: [String] { pendingSelection == nil ? engine.candidates : [] }
-
-    func selectCandidate(_ index: Int) {
-        let value = engine.selectCandidate(index)
-        pendingSelection = value
-    }
-
-    func backspace() {
-        pendingSelection = nil
-        engine.backspace()
-    }
-
-    func commit() -> String {
-        if let value = pendingSelection {
-            pendingSelection = nil
-            return value
-        }
-        return engine.commit()
-    }
-}
