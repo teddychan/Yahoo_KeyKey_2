@@ -156,10 +156,20 @@ final class InputController: IMKInputController {
     // action, independent of which controller instance receives it.
     override func menu() -> NSMenu! {
         let menu = NSMenu()
+        // Quick toggle: convert committed output Traditional -> Simplified. Check reflects state.
+        let convert = NSMenuItem(title: "輸出簡體字", action: #selector(toggleSimplified), keyEquivalent: "")
+        convert.target = self
+        convert.state = Preferences.outputSimplifiedEnabled ? .on : .off
+        menu.addItem(convert)
+        menu.addItem(.separator())
         let item = NSMenuItem(title: "偏好設定…", action: #selector(openPreferences), keyEquivalent: "")
         item.target = self
         menu.addItem(item)
         return menu
+    }
+
+    @objc private func toggleSimplified() {
+        Preferences.outputSimplifiedEnabled.toggle()
     }
 
     @objc private func openPreferences() {
