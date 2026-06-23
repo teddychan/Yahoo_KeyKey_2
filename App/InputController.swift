@@ -170,9 +170,14 @@ final class InputController: IMKInputController {
             if let chars = event.characters, let d = Int(chars), (1...9).contains(d) {
                 let index = candidatePage * InputController.pageSize + (d - 1)
                 if index < count {
-                    let phrase = associations[index]
+                    // Associations are full phrases that START with the just-committed
+                    // character (already in the document), so insert only the remainder
+                    // after it (好 + association "好像" -> insert "像", giving 好像).
+                    let suffix = String(associations[index].dropFirst())
                     clearAssociations()
-                    client.insertText(applyHanConvert(phrase), replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
+                    if !suffix.isEmpty {
+                        client.insertText(applyHanConvert(suffix), replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
+                    }
                     return true
                 }
                 return true // digit beyond this page: swallow, no insert
