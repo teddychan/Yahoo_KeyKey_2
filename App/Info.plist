@@ -17,9 +17,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.3.0</string>
+	<string>1.3.1</string>
 	<key>CFBundleVersion</key>
-	<string>6</string>
+	<string>7</string>
 	<key>ComponentInputModeDict</key>
 	<dict>
 		<key>tsInputModeListKey</key>
@@ -28,12 +28,18 @@
 			<dict>
 				<key>TISIntendedLanguage</key>
 				<string>zh-Hant</string>
+				<key>tsInputModeAlternateMenuIconFileKey</key>
+				<string>YahooKeyKey.tiff</string>
 				<key>tsInputModeCharacterRepertoireKey</key>
 				<array>
 					<string>Hant</string>
 				</array>
 				<key>tsInputModeIsVisibleKey</key>
 				<true/>
+				<key>tsInputModeMenuIconFileKey</key>
+				<string>YahooKeyKey.tiff</string>
+				<key>tsInputModePaletteIconFileKey</key>
+				<string>YahooKeyKey.tiff</string>
 				<key>tsInputModeScriptKey</key>
 				<string>smTradChinese</string>
 			</dict>
@@ -41,12 +47,18 @@
 			<dict>
 				<key>TISIntendedLanguage</key>
 				<string>zh-Hant</string>
+				<key>tsInputModeAlternateMenuIconFileKey</key>
+				<string>YahooKeyKey.tiff</string>
 				<key>tsInputModeCharacterRepertoireKey</key>
 				<array>
 					<string>Hant</string>
 				</array>
 				<key>tsInputModeIsVisibleKey</key>
 				<true/>
+				<key>tsInputModeMenuIconFileKey</key>
+				<string>YahooKeyKey.tiff</string>
+				<key>tsInputModePaletteIconFileKey</key>
+				<string>YahooKeyKey.tiff</string>
 				<key>tsInputModeScriptKey</key>
 				<string>smTradChinese</string>
 			</dict>
@@ -56,6 +68,8 @@
 			<string>com.github.teddychan.inputmethod.YahooKeyKey2.Cangjie</string>
 			<string>com.github.teddychan.inputmethod.YahooKeyKey2.Simplex</string>
 		</array>
+		<key>tsInputMethodIconFileKey</key>
+		<string>YahooKeyKey.tiff</string>
 	</dict>
 	<key>InputMethodConnectionName</key>
 	<string>com.github.teddychan.inputmethod.YahooKeyKey2_Connection</string>

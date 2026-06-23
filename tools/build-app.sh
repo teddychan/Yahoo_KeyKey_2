@@ -85,6 +85,15 @@ if [ ! -f "$APP_SRC/AppIcon.icns" ]; then
 fi
 cp "$APP_SRC/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 
+echo "==> Copying input-mode icons (YahooKeyKey.tiff + @2x)"
+for tiff in "$APP_SRC/YahooKeyKey.tiff" "$APP_SRC/YahooKeyKey@2x.tiff"; do
+  if [ ! -f "$tiff" ]; then
+    echo "ERROR: $(basename "$tiff") missing; run tools/make-icon.sh first" >&2
+    exit 1
+  fi
+  cp "$tiff" "$APP/Contents/Resources/"
+done
+
 echo "==> Copying localized strings (.lproj)"
 for lproj in "$APP_SRC"/*.lproj; do
   [ -d "$lproj" ] && cp -R "$lproj" "$APP/Contents/Resources/"

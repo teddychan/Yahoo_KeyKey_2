@@ -30,3 +30,12 @@ done
 echo "==> Assembling AppIcon.icns"
 iconutil -c icns "$ICONSET" -o "$ROOT/App/AppIcon.icns"
 echo "==> Done: $ROOT/App/AppIcon.icns"
+
+# The input-source picker / menu show a per-input-mode icon referenced from
+# Info.plist (tsInputMode*IconFileKey). Without it macOS draws a generic gray
+# placeholder. Emit a 16×16 (+@2x 32×32) TIFF from the same purple artwork so
+# 倉頡/速成 show the Yahoo! KeyKey logo. (Matches McBopomofo's Bopomofo.tiff.)
+echo "==> Rendering input-mode TIFFs (YahooKeyKey.tiff + @2x)"
+sips -s format tiff -z 16 16 "$SRC" --out "$ROOT/App/YahooKeyKey.tiff" >/dev/null
+sips -s format tiff -z 32 32 "$SRC" --out "$ROOT/App/YahooKeyKey@2x.tiff" >/dev/null
+echo "==> Done: $ROOT/App/YahooKeyKey.tiff, $ROOT/App/YahooKeyKey@2x.tiff"
