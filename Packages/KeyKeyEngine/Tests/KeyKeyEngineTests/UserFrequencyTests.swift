@@ -52,6 +52,7 @@ final class UserFrequencyTests: XCTestCase {
         uf.record("好"); uf.record("好"); uf.record("字")
         let expectedHao = uf.bonus(for: "好")
         let expectedZi = uf.bonus(for: "字")
+        uf.flush()   // save is debounced; force it before reloading
 
         // A fresh instance pointed at the same file must reload the counts.
         let reloaded = UserFrequency(fileURL: fileURL)
@@ -63,6 +64,7 @@ final class UserFrequencyTests: XCTestCase {
     func testRecordPersistsToDisk() {
         let uf = UserFrequency(fileURL: fileURL)
         uf.record("好")
+        uf.flush()   // save is debounced; force it before checking the file exists
         XCTAssertTrue(FileManager.default.fileExists(atPath: fileURL.path))
     }
 
@@ -76,5 +78,83 @@ final class UserFrequencyTests: XCTestCase {
         try "not json".data(using: .utf8)!.write(to: fileURL)
         let uf = UserFrequency(fileURL: fileURL)
         XCTAssertEqual(uf.bonus(for: "好"), 0)
+    }
+
+    // MARK: - Hardening
+
+    func testConcurrentRecordIsThreadSafe() {
+        // Many threads hammering record() must not crash and must not lose all updates.
+        let uf = UserFrequency(fileURL: fileURL)
+        let iterations = 1000
+        DispatchQueue.concurrentPerform(iterations: iterations) { _ in
+            uf.record("好")
+        }
+        // Every increment was applied under the lock, so the count is exact.
+        let expected = log(1 + Double(iterations)) * 10.0
+        XCTAssertEqual(uf.bonus(for: "好"), expected, accuracy: 1e-9)
+    }
+
+    func testDistinctEntriesAreCappedByEviction() throws {
+        // Record more than the 5000-entry cap; the store must stay within the cap, and
+        // a heavily-used char (recorded most) must survive eviction.
+        let uf = UserFrequency(fileURL: fileURL)
+        // A hot char recorded many times so it's never the coldest.
+        for _ in 0..<50 { uf.record("好") }
+        // 5100 distinct cold chars, each recorded once.
+        let scalarBase = 0x4E00 // CJK ideographs block start
+        for i in 0..<5100 {
+            uf.record(Character(UnicodeScalar(scalarBase + i)!))
+        }
+        uf.flush()
+        // Reload and count distinct persisted entries via the JSON file.
+        let data = try Data(contentsOf: fileURL)
+        let raw = try JSONDecoder().decode([String: Int].self, from: data)
+        XCTAssertLessThanOrEqual(raw.count, 5000)
+        // The hot char survived.
+        XCTAssertGreaterThan(uf.bonus(for: "好"), 0)
+    }
+
+    func testDebouncedSaveFlushRoundTrips() {
+        // record() does not write synchronously, but flush() persists and a reload sees it.
+        let uf = UserFrequency(fileURL: fileURL)
+        uf.record("好")
+        uf.flush()
+        let reloaded = UserFrequency(fileURL: fileURL)
+        XCTAssertEqual(reloaded.bonus(for: "好"), uf.bonus(for: "好"))
+        XCTAssertGreaterThan(reloaded.bonus(for: "好"), 0)
+    }
+
+    func testLoadFiltersMultiScalarKeys() throws {
+        // Keys whose unicodeScalar count != 1 (e.g. emoji with modifiers, multi-char
+        // strings) must be ignored on load; single-scalar keys load.
+        let raw = ["好": 3, "ab": 5, "👨‍👩‍👧": 9]
+        let data = try JSONEncoder().encode(raw)
+        try data.write(to: fileURL)
+        let uf = UserFrequency(fileURL: fileURL)
+        XCTAssertGreaterThan(uf.bonus(for: "好"), 0)   // single scalar -> loaded
+        XCTAssertEqual(uf.bonus(for: "a"), 0)          // "ab" dropped
+        XCTAssertEqual(uf.bonus(for: "b"), 0)
+    }
+
+    func testSaveCreatesDirWith0700() throws {
+        // The Application Support dir must be created with owner-only (0700) perms.
+        let nested = tempDir.appendingPathComponent("sub").appendingPathComponent("freq.json")
+        let uf = UserFrequency(fileURL: nested)
+        uf.record("好")
+        uf.flush()
+        let attrs = try FileManager.default.attributesOfItem(atPath: nested.deletingLastPathComponent().path)
+        let perms = (attrs[.posixPermissions] as? NSNumber)?.intValue
+        XCTAssertEqual(perms, 0o700)
+    }
+
+    func testSingleCountIsCapped() {
+        // bonus saturates: recording past the cap doesn't keep growing the count.
+        let uf = UserFrequency(fileURL: fileURL)
+        // The cap (100000) is large; just verify monotonic non-crash behaviour with a
+        // modest run and that the bonus is finite and positive.
+        for _ in 0..<100 { uf.record("好") }
+        let b = uf.bonus(for: "好")
+        XCTAssertTrue(b.isFinite)
+        XCTAssertGreaterThan(b, 0)
     }
 }

@@ -33,8 +33,8 @@ public struct LanguageModel {
     public func characterScores() -> [Character: Double] {
         var scores: [Character: Double] = [:]
         for grams in table.values {
-            for g in grams where g.value.count == 1 {
-                let ch = g.value.first!
+            for g in grams {
+                guard let ch = g.value.first, g.value.count == 1 else { continue }
                 if let existing = scores[ch] { scores[ch] = max(existing, g.score) }
                 else { scores[ch] = g.score }
             }

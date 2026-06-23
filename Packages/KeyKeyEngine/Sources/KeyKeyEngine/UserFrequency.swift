@@ -8,6 +8,13 @@ import Foundation
 // can't dominate forever) yet a few selections lift a learned character near the top of
 // its code's candidates. `weight` is sized to the LM log-probability span (~12) so the
 // bonus competes with — but does not blindly override — the language model's ordering.
+//
+// Designed as a SHARED singleton accessed from multiple IMK threads:
+//   - `bonus(for:)` / `record(_:)` are synchronous and thread-safe (guarded by a lock),
+//     so the engine can keep calling them inline.
+//   - `record` updates the in-memory count immediately (so `bonus` is always current) and
+//     schedules a coalesced background save rather than writing on every keystroke.
+//   - Distinct entries and single counts are capped to bound the on-disk file.
 public final class UserFrequency {
     // Default on-disk location: ~/Library/Application Support/YahooKeyKey2/user-frequency.json
     public static func defaultFileURL() -> URL {
@@ -17,9 +24,18 @@ public final class UserFrequency {
     }
 
     private static let weight = 10.0
+    // Bound the file: cap distinct learned characters (evict least-used past this), and
+    // cap any single count so the log-bonus can't grow unbounded.
+    private static let maxEntries = 5000
+    private static let maxCount = 100_000
+    private static let saveDelay: TimeInterval = 5
 
     private let fileURL: URL
+    private let lock = NSLock()
+    private let saveQueue = DispatchQueue(label: "YahooKeyKey2.UserFrequency.save", qos: .background)
     private var counts: [Character: Int]
+    private var dirty = false           // a save is pending/coalescing
+    private var saveScheduled = false   // a debounced save is already queued
 
     public init(fileURL: URL = UserFrequency.defaultFileURL()) {
         self.fileURL = fileURL
@@ -28,15 +44,57 @@ public final class UserFrequency {
 
     /// Ranking bonus for `char`, added on top of its LM score. Zero for unseen characters.
     public func bonus(for char: Character) -> Double {
-        guard let count = counts[char], count > 0 else { return 0 }
+        lock.lock()
+        let count = counts[char] ?? 0
+        lock.unlock()
+        guard count > 0 else { return 0 }
         return log(1 + Double(count)) * Self.weight
     }
 
-    /// Record one user selection of `char`, then persist. Fail-safe: a write error is logged
-    /// and dropped (the in-memory count still applies for this session).
+    /// Record one user selection of `char`. Updates the in-memory count immediately and
+    /// schedules a coalesced background save. Thread-safe.
     public func record(_ char: Character) {
-        counts[char, default: 0] += 1
-        save()
+        lock.lock()
+        let current = counts[char] ?? 0
+        // Cap a single count to bound the file; once at the cap the entry just stays.
+        counts[char] = min(current + 1, Self.maxCount)
+        evictIfNeededLocked()
+        dirty = true
+        let shouldSchedule = !saveScheduled
+        if shouldSchedule { saveScheduled = true }
+        lock.unlock()
+
+        if shouldSchedule {
+            saveQueue.asyncAfter(deadline: .now() + Self.saveDelay) { [weak self] in
+                self?.flushIfDirty()
+            }
+        }
+    }
+
+    /// Synchronously persist now if there are unsaved changes (e.g. on app termination).
+    public func flush() {
+        flushIfDirty()
+    }
+
+    // MARK: - Internal
+
+    // Drop the least-used entries when distinct entries exceed the cap. Caller holds `lock`.
+    private func evictIfNeededLocked() {
+        guard counts.count > Self.maxEntries else { return }
+        let overflow = counts.count - Self.maxEntries
+        // Evict the lowest counts first (ties broken arbitrarily — they're the coldest).
+        let victims = counts.sorted { $0.value < $1.value }.prefix(overflow).map(\.key)
+        for key in victims { counts.removeValue(forKey: key) }
+    }
+
+    private func flushIfDirty() {
+        lock.lock()
+        guard dirty else { lock.unlock(); return }
+        let snapshot = counts
+        dirty = false
+        saveScheduled = false
+        lock.unlock()
+        UserFrequency.save(snapshot, to: fileURL)
     }
 
     // MARK: - Persistence
@@ -48,19 +106,21 @@ public final class UserFrequency {
             return [:]
         }
         var result: [Character: Int] = [:]
-        for (key, value) in raw where key.count == 1 {
-            result[key.first!] = value
+        for (key, value) in raw where key.unicodeScalars.count == 1 {
+            if let ch = key.first { result[ch] = value }
         }
         return result
     }
 
-    private func save() {
+    private static func save(_ counts: [Character: Int], to url: URL) {
         let raw = Dictionary(uniqueKeysWithValues: counts.map { (String($0.key), $0.value) })
         guard let data = try? JSONEncoder().encode(raw) else { return }
         do {
-            try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(),
-                                                    withIntermediateDirectories: true)
-            try data.write(to: fileURL, options: .atomic)
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700])
+            try data.write(to: url, options: .atomic)
         } catch {
             NSLog("YahooKeyKey: failed to persist user frequency: \(error)")
         }

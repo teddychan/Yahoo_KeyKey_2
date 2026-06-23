@@ -4,6 +4,9 @@
 // same Simplex code, so candidate lists are larger than full Cangjie.
 public struct SimplexTable {
     private var table: [String: [String]] = [:]
+    // Shadow membership sets per simplex code, used only during construction for
+    // O(1) dedup instead of an O(n) `array.contains` scan per insert.
+    private var seen: [String: Set<String>] = [:]
 
     /// Builds the index from a full CangjieTable. Entries are processed in sorted
     /// Cangjie-code order so the grouped candidate lists are deterministic
@@ -34,8 +37,9 @@ public struct SimplexTable {
     public func characters(forCode code: String) -> [String] { table[code] ?? [] }
 
     private mutating func add(_ char: String, to simplex: String) {
-        if table[simplex]?.contains(char) == true { return }
-        table[simplex, default: []].append(char)
+        if seen[simplex, default: []].insert(char).inserted {
+            table[simplex, default: []].append(char)
+        }
     }
 
     private static func simplexCode(for cangjieCode: String) -> String {

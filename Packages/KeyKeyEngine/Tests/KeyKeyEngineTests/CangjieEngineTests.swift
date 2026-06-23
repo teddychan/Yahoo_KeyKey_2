@@ -176,6 +176,31 @@ final class CangjieEngineTests: XCTestCase {
         XCTAssertEqual(e.candidates, ["漏", "韻", "明", "冒"])
     }
 
+    func testCandidatesCacheInvalidatedByBackspace() {
+        // candidates is cached; mutating the code (backspace) must refresh it.
+        let e = make()
+        _ = e.handleKey("a"); _ = e.handleKey("b")
+        XCTAssertEqual(e.candidates, ["明"])   // "ab" -> caches
+        e.backspace()
+        XCTAssertEqual(e.candidates, ["日", "曰"])   // now "a", cache refreshed
+    }
+
+    func testCandidatesCacheInvalidatedByHandleKey() {
+        let e = make()
+        _ = e.handleKey("a")
+        XCTAssertEqual(e.candidates, ["日", "曰"])   // caches for "a"
+        _ = e.handleKey("b")
+        XCTAssertEqual(e.candidates, ["明"])   // appending "b" refreshes the cache
+    }
+
+    func testCandidatesCacheInvalidatedByCommit() {
+        let e = make()
+        _ = e.handleKey("a"); _ = e.handleKey("b")
+        XCTAssertEqual(e.candidates, ["明"])
+        _ = e.commit()
+        XCTAssertEqual(e.candidates, [])   // committed -> empty code, cache cleared
+    }
+
     func testRadicalMapCoversFullAlphabet() {
         for k in "abcdefghijklmnopqrstuvwxyz" {
             XCTAssertNotNil(CangjieEngine.radicals[k], "missing radical for \(k)")
