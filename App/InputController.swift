@@ -2,61 +2,25 @@ import Cocoa
 import InputMethodKit
 import KeyKeyEngine
 
-// Phonetic keyboard layout. Layout selection UI is deferred to Preferences; the engine
-// supports all four and defaults to Standard (大千).
-private enum LayoutChoice: String {
-    case standard
-    case eten
-    case hsu
-    case eten26
-
-    func makeLayout() -> PhoneticLayout {
-        switch self {
-        case .standard: return StandardLayout()
-        case .eten: return EtenLayout()
-        case .hsu: return HsuLayout()
-        case .eten26: return Eten26Layout()
-        }
-    }
-}
-
-// The input method, selected by the user as an IMK input MODE (see Info.plist
-// ComponentInputModeDict). IMK delivers the selection via setValue(_:forTag:client:).
-private enum InputMethodChoice: String {
-    case smartPhonetic
-    case plainPhonetic
-    case cangjie
-    case simplex
-
-    // Map an IMK input-mode identifier (…YahooKeyKey2.Cangjie etc.) to a method.
-    // v1.0.0 exposes only Cangjie and Simplex; default to Cangjie.
-    init(modeID: String) {
-        if modeID.hasSuffix(".Simplex") { self = .simplex }
-        else if modeID.hasSuffix(".PlainPhonetic") { self = .plainPhonetic }
-        else if modeID.hasSuffix(".SmartPhonetic") { self = .smartPhonetic }
-        else { self = .cangjie }
-    }
-
-    // Cangjie and Simplex select directly by digit: their keys are a–z, so digits are
-    // unambiguous selectors. Phonetic methods use Down-then-digit, because in Bopomofo
-    // layouts several digit keys ("1"=ㄅ, "2"=ㄉ, …) are valid input and must not be hijacked.
-    var usesDirectDigitSelect: Bool { self == .cangjie || self == .simplex }
-}
-
 @objc(InputController)
 final class InputController: IMKInputController {
     private let lm: LanguageModel
     private let characterRank: [Character: Double]
+    // User learning: persisted selection-count store providing a live ranking bonus for
+    // Cangjie/Simplex candidates, so committed characters surface higher next time.
+    private let userFreq: UserFrequency
     private let associatedPhrases: AssociatedPhrases
     private let cangjieTable: CangjieTable
     private let simplexTable: SimplexTable
     // Traditional→Simplified character converter, applied only when Preferences.outputSimplifiedEnabled.
     private let hanConvertFilter: HanConvertFilter
-    private let layout: LayoutChoice = .standard
-    private var method: InputMethodChoice = .cangjie
+    // Registry of available input methods (the first is the default). Adding a method is a
+    // one-place change here plus an Info.plist input mode — see InputMethodModule.
+    private let modules: [InputMethodModule]
+    // The active module; selected by Info.plist mode id via setValue(_:forTag:client:).
+    private var currentModule: InputMethodModule
     private var engine: InputEngine
     private let candidateWindow = CandidateWindow()
-    private var selecting = false
     // Current candidate page (9 per page) for the active composition; reused for association paging.
     private var candidatePage = 0
     // Associated phrases (聯想) offered after committing a single character; empty when not in
@@ -120,52 +84,86 @@ final class InputController: IMKInputController {
         }
         self.hanConvertFilter = HanConvertFilter(direction: .traditionalToSimplified, table: hanConvertTable)
 
-        // Start on Cangjie; IMK calls setValue(_:forTag:client:) with the active input mode
-        // (and on every mode switch), which rebuilds the engine accordingly.
-        self.engine = InputController.makeEngine(method: .cangjie, layout: .standard,
-                                                 lm: lm, characterRank: characterRank,
-                                                 cangjieTable: cangjieTable,
-                                                 simplexTable: simplexTable)
-        super.init(server: server, delegate: delegate, client: inputClient)
-    }
+        // Load the persisted user-learning store (fail-safe to empty if absent/corrupt).
+        let userFreq = UserFrequency()
+        self.userFreq = userFreq
 
-    // Build the engine for the active method, wrapping in an adapter where the engine
-    // surface doesn't already match the app-internal InputEngine protocol.
-    private static func makeEngine(method: InputMethodChoice, layout: LayoutChoice,
-                                   lm: LanguageModel, characterRank: [Character: Double],
-                                   cangjieTable: CangjieTable,
-                                   simplexTable: SimplexTable) -> InputEngine {
-        switch method {
-        case .smartPhonetic:
-            return SmartPhoneticEngine(languageModel: lm, layout: layout.makeLayout())
-        case .plainPhonetic:
-            return PlainPhoneticEngineAdapter(PlainPhoneticEngine(languageModel: lm, layout: layout.makeLayout()))
-        case .cangjie:
-            return CangjieEngine(table: cangjieTable, characterRank: characterRank)
-        case .simplex:
-            return SimplexEngine(table: simplexTable, characterRank: characterRank)
-        }
+        // Live user-learning bonus; the closure consults the store on every sort, so a
+        // freshly-committed character promotes without rebuilding the engine.
+        let userRank: (Character) -> Double = { [userFreq] in userFreq.bonus(for: $0) }
+
+        // The input-method registry. Each module's makeEngine captures the shared tables/ranks.
+        // To add a method: append a module here and an Info.plist input mode — nothing else.
+        let modules = [
+            InputMethodModule(modeSuffix: "Cangjie", displayName: "倉頡") {
+                CangjieEngine(table: cangjieTable, characterRank: characterRank, userRank: userRank)
+            },
+            InputMethodModule(modeSuffix: "Simplex", displayName: "速成") {
+                SimplexEngine(table: simplexTable, characterRank: characterRank, userRank: userRank)
+            },
+        ]
+        self.modules = modules
+
+        // Start on the default (first) module; IMK calls setValue(_:forTag:client:) with the
+        // active input mode (and on every mode switch), which rebuilds the engine accordingly.
+        self.currentModule = modules[0]
+        self.engine = modules[0].makeEngine()
+        super.init(server: server, delegate: delegate, client: inputClient)
     }
 
     override func recognizedEvents(_ sender: Any!) -> Int {
         Int(NSEvent.EventTypeMask.keyDown.rawValue)
     }
 
-    // IMK input-menu (the menu shown in the input-method menu-bar item). A single
-    // "Preferences…" item opens the SHARED Preferences window — a stateless "open window"
-    // action, independent of which controller instance receives it.
+    // IMK input-menu (the menu shown in the input-method menu-bar item), grouped to
+    // mirror the original Yahoo! KeyKey settings layout:
+    //   1. general toggles (聯想字詞 / 全形標點 / 輸出簡體字), checkmarks reflect live prefs;
+    //   2. any settings specific to the active input method (none for Cangjie/Simplex today);
+    //   3. 偏好設定… and 關於… (stateless "open window" actions, shared windows).
     override func menu() -> NSMenu! {
         let menu = NSMenu()
-        // Quick toggle: convert committed output Traditional -> Simplified. Check reflects state.
+
+        // 1. General toggles. Each flips its Preferences value live; checkmark reflects state.
+        let associate = NSMenuItem(title: "聯想字詞", action: #selector(toggleAssociated), keyEquivalent: "")
+        associate.target = self
+        associate.state = Preferences.associatedPhrasesEnabled ? .on : .off
+        menu.addItem(associate)
+
+        let fullWidth = NSMenuItem(title: "全形標點", action: #selector(toggleFullWidth), keyEquivalent: "")
+        fullWidth.target = self
+        fullWidth.state = Preferences.fullWidthPunctuationEnabled ? .on : .off
+        menu.addItem(fullWidth)
+
         let convert = NSMenuItem(title: "輸出簡體字", action: #selector(toggleSimplified), keyEquivalent: "")
         convert.target = self
         convert.state = Preferences.outputSimplifiedEnabled ? .on : .off
         menu.addItem(convert)
+
+        // 2. Settings specific to the active input method (grouped with their method).
+        // Empty for Cangjie/Simplex today; future methods supply items via methodMenuItems.
+        let methodItems = currentModule.methodMenuItems()
+        if !methodItems.isEmpty {
+            menu.addItem(.separator())
+            methodItems.forEach(menu.addItem)
+        }
+
+        // 3. Preferences and About.
         menu.addItem(.separator())
-        let item = NSMenuItem(title: "偏好設定…", action: #selector(openPreferences), keyEquivalent: "")
-        item.target = self
-        menu.addItem(item)
+        let prefs = NSMenuItem(title: "偏好設定…", action: #selector(openPreferences), keyEquivalent: "")
+        prefs.target = self
+        menu.addItem(prefs)
+        let about = NSMenuItem(title: "關於 Yahoo KeyKey 2…", action: #selector(openAbout), keyEquivalent: "")
+        about.target = self
+        menu.addItem(about)
         return menu
+    }
+
+    @objc private func toggleAssociated() {
+        Preferences.associatedPhrasesEnabled.toggle()
+    }
+
+    @objc private func toggleFullWidth() {
+        Preferences.fullWidthPunctuationEnabled.toggle()
     }
 
     @objc private func toggleSimplified() {
@@ -176,26 +174,28 @@ final class InputController: IMKInputController {
         PreferencesWindowController.shared.show()
     }
 
+    @objc private func openAbout() {
+        AboutWindowController.shared.show()
+    }
+
     // IMK calls this when the user selects one of our input modes (Info.plist
     // ComponentInputModeDict). The value is the mode identifier string.
     override func setValue(_ value: Any!, forTag tag: Int, client sender: Any!) {
         let modeID = value as? String ?? ""
-        let choice = InputMethodChoice(modeID: modeID)
-        guard choice != method else { return }
+        // Look up the module whose suffix matches the IMK mode id; default to the first.
+        let module = modules.first { modeID.hasSuffix(".\($0.modeSuffix)") } ?? modules[0]
+        guard module.modeSuffix != currentModule.modeSuffix else { return }
         // Commit any in-progress composition so the rebuilt engine starts clean.
         if let client = sender as? IMKTextInput ?? client() {
             _ = commitCurrent(to: client)
         } else {
             _ = engine.commit()
         }
-        selecting = false
         candidatePage = 0
         associations = []
         candidateWindow.hide()
-        method = choice
-        engine = InputController.makeEngine(method: choice, layout: layout, lm: lm,
-                                            characterRank: characterRank,
-                                            cangjieTable: cangjieTable, simplexTable: simplexTable)
+        currentModule = module
+        engine = module.makeEngine()
     }
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
@@ -242,30 +242,10 @@ final class InputController: IMKInputController {
             return true
         }
 
-        // Selection mode (entered via Down): digits pick a candidate; Esc just closes the
-        // picker and keeps the composition; any other key resumes normal composing.
-        if selecting {
-            if event.keyCode == 53 { // Escape exits selection without discarding composition
-                selecting = false; refresh(client); return true
-            }
-            if event.keyCode == 49 { // Space confirms the current/top candidate
-                if !engine.candidates.isEmpty { engine.selectCandidate(0) }
-                return commitCurrent(to: client, offerAssociations: true)
-            }
-            if let chars = event.characters, let d = Int(chars), (1...9).contains(d),
-               d - 1 < engine.candidates.count {
-                engine.selectCandidate(d - 1)
-                selecting = false
-                return commitCurrent(to: client, offerAssociations: true)
-            }
-            selecting = false   // fall through to normal composing below
-        }
-
         // Cangjie/Simplex show candidates as soon as a code resolves, and their keys are a–z,
         // so digits 1–9 select directly within the current page, and arrows page through the
-        // full candidate list. (Phonetic methods use Down-then-digit, since digit keys are
-        // valid Bopomofo input there.)
-        if method.usesDirectDigitSelect, !engine.candidates.isEmpty {
+        // full candidate list.
+        if !engine.candidates.isEmpty {
             let count = engine.candidates.count
             let lastPage = (count - 1) / InputController.pageSize
             switch event.keyCode {
@@ -287,35 +267,25 @@ final class InputController: IMKInputController {
             }
         }
 
-        // SPACE: while a syllable is still being composed (no tone yet), fall through so the
-        // engine receives " " as tone 1 and finalizes it. Once a composition is finalized,
-        // SPACE confirms/commits it; with nothing composing, let a literal space through.
+        // SPACE: with an active composition, commit the first candidate of the current page;
+        // with nothing composing, let a literal space through.
         if event.keyCode == 49 { // Space
-            if engine.isComposingSyllable {
-                // fall through to engine.handleKey(" ") below to finalize as tone 1
-            } else if !engine.composingText.isEmpty {
-                if method == .smartPhonetic {
-                    return commitCurrent(to: client, offerAssociations: true)
-                } else if method.usesDirectDigitSelect { // .cangjie / .simplex: commit first of current page
-                    if !engine.candidates.isEmpty {
-                        engine.selectCandidate(candidatePage * InputController.pageSize)
-                    }
-                    return commitCurrent(to: client, offerAssociations: true)
-                } else { // .plainPhonetic: commit the top candidate
-                    if !engine.candidates.isEmpty { engine.selectCandidate(0) }
-                    return commitCurrent(to: client, offerAssociations: true)
+            if !engine.composingText.isEmpty {
+                if !engine.candidates.isEmpty {
+                    engine.selectCandidate(candidatePage * InputController.pageSize)
                 }
+                return commitCurrent(to: client, offerAssociations: true)
             } else {
                 return false // nothing composing: pass a literal space to the app
             }
         }
 
-        // Enter commits; Backspace deletes; Esc cancels; Down opens selection; mapped keys feed the engine.
+        // Enter commits; Backspace deletes; Esc cancels; mapped keys feed the engine.
         switch event.keyCode {
         case 36: // Return
             guard !engine.composingText.isEmpty else { return false }
             // Cangjie/Simplex: commit the first candidate of the current page.
-            if method.usesDirectDigitSelect, !engine.candidates.isEmpty {
+            if !engine.candidates.isEmpty {
                 engine.selectCandidate(candidatePage * InputController.pageSize)
             }
             return commitCurrent(to: client, offerAssociations: true)
@@ -325,9 +295,6 @@ final class InputController: IMKInputController {
         case 53: // Escape cancels composition (commit-then-discard)
             guard !engine.composingText.isEmpty else { return false }
             _ = engine.commit(); candidatePage = 0; refresh(client); return true
-        case 125: // Down arrow opens candidate selection
-            guard !engine.composingText.isEmpty, !engine.candidates.isEmpty else { return false }
-            selecting = true; refresh(client); return true
         default: break
         }
 
@@ -336,9 +303,6 @@ final class InputController: IMKInputController {
         if consumed {
             // A new radical/key changes the candidate set; restart paging from page 0.
             candidatePage = 0
-            // Plain Phonetic: as soon as a syllable completes, show its numbered candidates
-            // (incl. after space=tone 1) so digits 1–9 select. Down still works.
-            if method == .plainPhonetic, !engine.candidates.isEmpty { selecting = true }
             refresh(client)
         }
         return consumed
@@ -351,11 +315,12 @@ final class InputController: IMKInputController {
 
     @discardableResult
     private func commitCurrent(to client: IMKTextInput, offerAssociations: Bool = false) -> Bool {
-        selecting = false
         candidatePage = 0
         let text = engine.commit()
         if !text.isEmpty {
             client.insertText(applyHanConvert(text), replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
+            // User learning: remember single-character selections so they rank higher next time.
+            if text.count == 1, let ch = text.first { userFreq.record(ch) }
         }
         client.setMarkedText("", selectionRange: NSRange(location: 0, length: 0),
                              replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
@@ -394,12 +359,10 @@ final class InputController: IMKInputController {
                              selectionRange: NSRange(location: composing.utf16.count, length: 0),
                              replacementRange: NSRange(location: NSNotFound, length: NSNotFound))
         // In association mode show the suggested phrases (paged); otherwise show engine candidates.
-        // Only show the numbered candidate window when number keys actually select:
-        // in `selecting` mode (phonetic, after Down) or for Cangjie (direct digit-select).
-        // Otherwise the list would imply number-select while digits are still Bopomofo input.
+        // Cangjie/Simplex always select by digit, so the numbered candidate window is shown
+        // whenever there is something to pick.
         let cands = associations.isEmpty ? engine.candidates : associations
-        let numbersSelect = !associations.isEmpty || selecting || method.usesDirectDigitSelect
-        if cands.isEmpty || !numbersSelect { candidateWindow.hide() }
+        if cands.isEmpty { candidateWindow.hide() }
         else {
             let size = InputController.pageSize
             let pageCount = (cands.count + size - 1) / size

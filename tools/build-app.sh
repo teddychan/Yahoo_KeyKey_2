@@ -44,7 +44,7 @@ swiftc \
   -swift-version 5 \
   -I "$MODULE_DIR" -L "$MODULE_DIR" -lKeyKeyEngine \
   -framework InputMethodKit -framework Cocoa \
-  "$APP_SRC"/main.swift "$APP_SRC"/InputController.swift "$APP_SRC"/InputEngine.swift "$APP_SRC"/CandidateWindow.swift "$APP_SRC"/Preferences.swift "$APP_SRC"/PreferencesWindow.swift
+  "$APP_SRC"/main.swift "$APP_SRC"/InputController.swift "$APP_SRC"/InputEngine.swift "$APP_SRC"/InputMethodModule.swift "$APP_SRC"/CandidateWindow.swift "$APP_SRC"/Preferences.swift "$APP_SRC"/PreferencesWindow.swift "$APP_SRC"/AboutWindow.swift
 
 echo "==> Assembling Info.plist (resolving \${EXECUTABLE_NAME})"
 sed "s/\${EXECUTABLE_NAME}/$EXECUTABLE_NAME/g" "$APP_SRC/Info.plist" > "$APP/Contents/Info.plist"
@@ -70,6 +70,13 @@ if [ ! -f "$ROOT/Packages/KeyKeyEngine/Resources/opencc-TSCharacters.txt" ]; the
   exit 1
 fi
 cp "$ROOT/Packages/KeyKeyEngine/Resources/opencc-TSCharacters.txt" "$APP/Contents/Resources/opencc-TSCharacters.txt"
+
+echo "==> Copying app icon (AppIcon.icns)"
+if [ ! -f "$APP_SRC/AppIcon.icns" ]; then
+  echo "ERROR: App/AppIcon.icns missing; run tools/make-icon.sh first" >&2
+  exit 1
+fi
+cp "$APP_SRC/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 
 echo "==> Copying localized strings (.lproj)"
 for lproj in "$APP_SRC"/*.lproj; do
