@@ -18,9 +18,13 @@ APP_SRC="$ROOT/App"
 MODULE_DIR="$BUILD/modules"
 EXECUTABLE_NAME="YahooKeyKey2"
 ENTITLEMENTS="$APP_SRC/YahooKeyKey2.entitlements"
+SPARKLE_CACHE="$ROOT/build/sparkle"
 
 SDK="$(xcrun --show-sdk-path)"
 TARGET="$(uname -m)-apple-macosx12.0"
+
+echo "==> Ensuring Sparkle is vendored"
+"$ROOT/tools/fetch-sparkle.sh"
 
 echo "==> Cleaning previous build"
 rm -rf "$APP" "$MODULE_DIR"
@@ -45,6 +49,8 @@ swiftc \
   -swift-version 5 \
   -I "$MODULE_DIR" -L "$MODULE_DIR" -lKeyKeyEngine \
   -framework InputMethodKit -framework Cocoa \
+  -F "$SPARKLE_CACHE" -framework Sparkle \
+  -Xlinker -rpath -Xlinker @executable_path/../Frameworks \
   "$APP_SRC"/main.swift "$APP_SRC"/InputController.swift "$APP_SRC"/SharedResources.swift "$APP_SRC"/InputEngine.swift "$APP_SRC"/InputMethodModule.swift "$APP_SRC"/CandidateWindow.swift "$APP_SRC"/Preferences.swift "$APP_SRC"/AboutWindow.swift
 
 echo "==> Assembling Info.plist (resolving \${EXECUTABLE_NAME})"
@@ -84,8 +90,21 @@ for lproj in "$APP_SRC"/*.lproj; do
   [ -d "$lproj" ] && cp -R "$lproj" "$APP/Contents/Resources/"
 done
 
-echo "==> Ad-hoc code-signing the bundle (hardened runtime + explicit entitlements)"
-codesign --force --deep --options runtime --entitlements "$ENTITLEMENTS" -s - "$APP"
+echo "==> Embedding Sparkle.framework"
+mkdir -p "$APP/Contents/Frameworks"
+rm -rf "$APP/Contents/Frameworks/Sparkle.framework"
+cp -R "$SPARKLE_CACHE/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
+chmod -R u+w "$APP/Contents/Frameworks/Sparkle.framework"
+
+echo "==> Code-signing Sparkle inside-out, then the app (ad-hoc)"
+SPARKLE_FW="$APP/Contents/Frameworks/Sparkle.framework"
+SPARKLE_V="$(/bin/ls -d "$SPARKLE_FW"/Versions/* | grep -v '/Current$' | head -1)"
+for item in "$SPARKLE_V"/XPCServices/*.xpc "$SPARKLE_V/Autoupdate" "$SPARKLE_V/Updater.app"; do
+  [ -e "$item" ] && codesign --force --options runtime -s - "$item"
+done
+codesign --force --options runtime -s - "$SPARKLE_FW"
+# Sign the app last. No --deep: nested code (Sparkle) is already signed above.
+codesign --force --options runtime --entitlements "$ENTITLEMENTS" -s - "$APP"
 codesign -dv "$APP"
 
 echo "==> Done: $APP"

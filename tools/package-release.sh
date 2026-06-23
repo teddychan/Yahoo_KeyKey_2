@@ -55,7 +55,14 @@ if [ -n "${DEVELOPER_ID_APP:-}" ]; then
   # --options runtime enables the hardened runtime (required for notarization).
   # --timestamp embeds a secure timestamp. --deep signs nested code (the static
   # lib is linked in, but --deep is harmless and matches build-app.sh's style).
-  codesign --force --deep --options runtime --timestamp \
+  SPARKLE_FW="$APP/Contents/Frameworks/Sparkle.framework"
+  SPARKLE_V="$(/bin/ls -d "$SPARKLE_FW"/Versions/* | grep -v '/Current$' | head -1)"
+  for item in "$SPARKLE_V"/XPCServices/*.xpc "$SPARKLE_V/Autoupdate" "$SPARKLE_V/Updater.app"; do
+    [ -e "$item" ] && codesign --force --options runtime --timestamp --sign "$DEVELOPER_ID_APP" "$item"
+  done
+  codesign --force --options runtime --timestamp --sign "$DEVELOPER_ID_APP" "$SPARKLE_FW"
+  # Sign the app last; no --deep (Sparkle is already signed inside-out above).
+  codesign --force --options runtime --timestamp \
     --entitlements "$ENTITLEMENTS" \
     --sign "$DEVELOPER_ID_APP" "$APP"
   echo "==> Verifying signature"
