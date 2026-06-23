@@ -20,6 +20,9 @@ public final class CangjieEngine {
     private let userRank: (Character) -> Double
     private var code: String = ""
     private var selected: String?
+    // Cached result of the `candidates` computation; invalidated (nil) on any state
+    // change to the code. `candidates` is read multiple times per keydown.
+    private var cachedCandidates: [String]?
 
     public init(table: CangjieTable, characterRank: [Character: Double] = [:],
                 userRank: @escaping (Character) -> Double = { _ in 0 }) {
@@ -36,6 +39,7 @@ public final class CangjieEngine {
         guard code.count < Self.maxRadicals else { return true }
         code.append(key)
         selected = nil
+        cachedCandidates = nil
         return true
     }
 
@@ -52,14 +56,22 @@ public final class CangjieEngine {
     /// stable-sorted so common characters (higher rank) come first. With an empty
     /// rank the table order is preserved unchanged.
     public var candidates: [String] {
+        if let cachedCandidates { return cachedCandidates }
+        let result = computeCandidates()
+        cachedCandidates = result
+        return result
+    }
+
+    private func computeCandidates() -> [String] {
         guard !code.isEmpty else { return [] }
         let matches = table.characters(matching: code)
-        return matches.enumerated().sorted { lhs, rhs in
-            let l = Self.score(for: lhs.element, rank: characterRank, userRank: userRank)
-            let r = Self.score(for: rhs.element, rank: characterRank, userRank: userRank)
-            if l != r { return l > r }
-            return lhs.offset < rhs.offset
-        }.map(\.element)
+        // Score each candidate ONCE, then sort the (element, score) pairs.
+        return matches.enumerated().map { offset, element in
+            (offset, element, Self.score(for: element, rank: characterRank, userRank: userRank))
+        }.sorted { lhs, rhs in
+            if lhs.2 != rhs.2 { return lhs.2 > rhs.2 }
+            return lhs.0 < rhs.0
+        }.map(\.1)
     }
 
     // Combined sort score: dict rank (or a finite floor for unranked chars, kept below any
@@ -84,6 +96,7 @@ public final class CangjieEngine {
     public func backspace() {
         selected = nil
         if !code.isEmpty { code.removeLast() }
+        cachedCandidates = nil
     }
 
     @discardableResult
@@ -91,6 +104,7 @@ public final class CangjieEngine {
         let text = selected ?? candidates.first ?? ""
         code = ""
         selected = nil
+        cachedCandidates = nil
         return text
     }
 }

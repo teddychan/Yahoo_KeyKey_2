@@ -89,9 +89,15 @@ RES_DIR="$BUILD/pkg-resources"
 rm -rf "$DIST_DIR" "$RES_DIR"
 mkdir -p "$DIST_DIR" "$RES_DIR"
 
-sed -e "s/__VERSION__/$VERSION/g" \
-    -e "s|__COMPONENT_PKG__|$(basename "$COMPONENT_PKG")|g" \
-    "$INSTALLER_SRC/distribution.xml.template" > "$DIST_DIR/distribution.xml"
+# Literal string replacement (values passed as argv, never interpolated into the
+# script), so a version or filename containing / or & can't corrupt the output.
+python3 -c 'import sys
+src, dst, v, p = sys.argv[1:5]
+with open(src) as f: t = f.read()
+t = t.replace("__VERSION__", v).replace("__COMPONENT_PKG__", p)
+with open(dst, "w") as f: f.write(t)' \
+    "$INSTALLER_SRC/distribution.xml.template" "$DIST_DIR/distribution.xml" \
+    "$VERSION" "$(basename "$COMPONENT_PKG")"
 
 cp "$INSTALLER_SRC/welcome.txt" "$RES_DIR/welcome.txt"
 cp "$INSTALLER_SRC/conclusion.txt" "$RES_DIR/conclusion.txt"

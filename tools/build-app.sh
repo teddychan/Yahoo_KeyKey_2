@@ -17,6 +17,7 @@ ENGINE_SRC="$ROOT/Packages/KeyKeyEngine/Sources/KeyKeyEngine"
 APP_SRC="$ROOT/App"
 MODULE_DIR="$BUILD/modules"
 EXECUTABLE_NAME="YahooKeyKey2"
+ENTITLEMENTS="$APP_SRC/YahooKeyKey2.entitlements"
 
 SDK="$(xcrun --show-sdk-path)"
 TARGET="$(uname -m)-apple-macosx12.0"
@@ -44,7 +45,7 @@ swiftc \
   -swift-version 5 \
   -I "$MODULE_DIR" -L "$MODULE_DIR" -lKeyKeyEngine \
   -framework InputMethodKit -framework Cocoa \
-  "$APP_SRC"/main.swift "$APP_SRC"/InputController.swift "$APP_SRC"/InputEngine.swift "$APP_SRC"/InputMethodModule.swift "$APP_SRC"/CandidateWindow.swift "$APP_SRC"/Preferences.swift "$APP_SRC"/PreferencesWindow.swift "$APP_SRC"/AboutWindow.swift
+  "$APP_SRC"/main.swift "$APP_SRC"/InputController.swift "$APP_SRC"/SharedResources.swift "$APP_SRC"/InputEngine.swift "$APP_SRC"/InputMethodModule.swift "$APP_SRC"/CandidateWindow.swift "$APP_SRC"/Preferences.swift "$APP_SRC"/PreferencesWindow.swift "$APP_SRC"/AboutWindow.swift
 
 echo "==> Assembling Info.plist (resolving \${EXECUTABLE_NAME})"
 sed "s/\${EXECUTABLE_NAME}/$EXECUTABLE_NAME/g" "$APP_SRC/Info.plist" > "$APP/Contents/Info.plist"
@@ -83,8 +84,8 @@ for lproj in "$APP_SRC"/*.lproj; do
   [ -d "$lproj" ] && cp -R "$lproj" "$APP/Contents/Resources/"
 done
 
-echo "==> Ad-hoc code-signing the bundle"
-codesign --force --deep -s - "$APP"
+echo "==> Ad-hoc code-signing the bundle (hardened runtime + explicit entitlements)"
+codesign --force --deep --options runtime --entitlements "$ENTITLEMENTS" -s - "$APP"
 codesign -dv "$APP"
 
 echo "==> Done: $APP"

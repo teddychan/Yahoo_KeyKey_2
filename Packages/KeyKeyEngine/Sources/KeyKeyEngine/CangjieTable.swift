@@ -4,6 +4,19 @@ import Foundation
 // Line format: "<code>\t<char>", one mapping per line (matches Resources/cangjie.txt).
 public struct CangjieTable {
     private var table: [String: [String]] = [:]
+    // Compiled-regex cache for wildcard patterns. A reference-type box so the cache
+    // survives across calls on a `let`-bound (non-mutating) table; the set of distinct
+    // wildcard patterns the user types is tiny, so this stays small.
+    private final class RegexCache {
+        private var cache: [String: NSRegularExpression] = [:]
+        func regex(for pattern: String) -> NSRegularExpression? {
+            if let cached = cache[pattern] { return cached }
+            guard let re = try? NSRegularExpression(pattern: pattern) else { return nil }
+            cache[pattern] = re
+            return re
+        }
+    }
+    private let regexCache = RegexCache()
 
     public init(text: String) {
         for rawLine in text.split(separator: "\n", omittingEmptySubsequences: true) {
@@ -37,7 +50,7 @@ public struct CangjieTable {
         let regex = "^" + pattern.split(separator: "*", omittingEmptySubsequences: false)
             .map { NSRegularExpression.escapedPattern(for: String($0)) }
             .joined(separator: "[a-z]+") + "$"
-        guard let re = try? NSRegularExpression(pattern: regex) else { return [] }
+        guard let re = regexCache.regex(for: regex) else { return [] }
         let matched = table.keys.filter {
             re.firstMatch(in: $0, range: NSRange($0.startIndex..., in: $0)) != nil
         }

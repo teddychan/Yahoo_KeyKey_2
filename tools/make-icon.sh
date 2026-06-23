@@ -74,7 +74,12 @@ let bitmap = NSBitmapImageRep(cgImage: cgImage)
 guard let png = bitmap.representation(using: .png, properties: [:]) else {
     fatalError("could not encode PNG")
 }
-try! png.write(to: URL(fileURLWithPath: outPath))
+do {
+    try png.write(to: URL(fileURLWithPath: outPath))
+} catch {
+    FileHandle.standardError.write(Data("could not write PNG to \(outPath): \(error)\n".utf8))
+    exit(1)
+}
 SWIFT
 }
 

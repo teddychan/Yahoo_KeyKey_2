@@ -25,6 +25,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD="$ROOT/build"
 APP="$BUILD/YahooKeyKey2.app"
 APP_NAME="YahooKeyKey2.app"
+ENTITLEMENTS="$ROOT/App/YahooKeyKey2.entitlements"
 
 # --- 1. Build the .app ------------------------------------------------------
 echo "==> Building YahooKeyKey2.app"
@@ -55,6 +56,7 @@ if [ -n "${DEVELOPER_ID_APP:-}" ]; then
   # --timestamp embeds a secure timestamp. --deep signs nested code (the static
   # lib is linked in, but --deep is harmless and matches build-app.sh's style).
   codesign --force --deep --options runtime --timestamp \
+    --entitlements "$ENTITLEMENTS" \
     --sign "$DEVELOPER_ID_APP" "$APP"
   echo "==> Verifying signature"
   codesign --verify --strict --verbose=2 "$APP"
