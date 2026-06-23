@@ -174,6 +174,14 @@ final class InputController: IMKInputController {
                 return true
             default: break
             }
+            // SPACE pages to the next association page (wrapping last → first). On a
+            // single page, fall through to dismiss the suggestions and insert a
+            // literal space.
+            if event.keyCode == 49, lastPage > 0 {
+                candidatePage = (candidatePage + 1) % (lastPage + 1)
+                refresh(client)
+                return true
+            }
             if let chars = event.characters, let d = Int(chars), (1...9).contains(d) {
                 let index = candidatePage * InputController.pageSize + (d - 1)
                 if index < count {
@@ -217,6 +225,14 @@ final class InputController: IMKInputController {
                 if candidatePage > 0 { candidatePage -= 1; refresh(client) }
                 return true
             default: break
+            }
+            // SPACE pages to the next candidate page (wrapping last → first). On a
+            // single page there is nothing to page, so fall through to the
+            // commit-first-candidate-on-space behaviour below.
+            if event.keyCode == 49, lastPage > 0 {
+                candidatePage = (candidatePage + 1) % (lastPage + 1)
+                refresh(client)
+                return true
             }
             if let chars = event.characters, let d = Int(chars), (1...9).contains(d) {
                 let index = candidatePage * InputController.pageSize + (d - 1)
