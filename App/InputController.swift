@@ -103,11 +103,8 @@ final class InputController: IMKInputController {
             methodItems.forEach(menu.addItem)
         }
 
-        // 3. Preferences and About.
+        // 3. About (settings live as the toggles above; no separate Preferences window).
         menu.addItem(.separator())
-        let prefs = NSMenuItem(title: "偏好設定…", action: #selector(openPreferences), keyEquivalent: "")
-        prefs.target = self
-        menu.addItem(prefs)
         let about = NSMenuItem(title: "關於 Yahoo KeyKey 2…", action: #selector(openAbout), keyEquivalent: "")
         about.target = self
         menu.addItem(about)
@@ -124,10 +121,6 @@ final class InputController: IMKInputController {
 
     @objc private func toggleSimplified() {
         Preferences.outputSimplifiedEnabled.toggle()
-    }
-
-    @objc private func openPreferences() {
-        PreferencesWindowController.shared.show()
     }
 
     @objc private func openAbout() {
@@ -330,7 +323,7 @@ final class InputController: IMKInputController {
             var rect = NSRect.zero
             client.attributes(forCharacterIndex: 0, lineHeightRectangle: &rect)
             candidateWindow.show(page, page: candidatePage, pageCount: pageCount,
-                                 fontSize: Preferences.candidateFontSize, near: rect.origin)
+                                 fontSize: Preferences.candidateFontSize, near: rect)
         }
     }
 }
