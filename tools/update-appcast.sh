@@ -40,4 +40,4 @@ if ! grep -q "sparkle:minimumSystemVersion" "$OUT"; then
 fi
 
 echo "==> Wrote appcast: $OUT"
-echo "    Copy it to the website repo at docs/keykey/appcast.xml and commit."
+echo "    Copy it to the website repo at docs/yahoo-keykey-2/appcast.xml and commit."

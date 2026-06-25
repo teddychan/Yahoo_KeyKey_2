@@ -100,11 +100,27 @@ who installed directly (not via Homebrew) get updates automatically.
    longer ship signed updates. (KeyKey reuses the same Sparkle signing key as
    ClipMenu 2.)
 
-### Per release
+### Per release (automated)
+
+The recommended path is CI: bump the version (step 1 below), commit, then push a
+`v<version>` tag to `teddychan/yahoo-keykey-2`. `.github/workflows/release.yml`
+(GitHub-hosted macOS runner) builds, Developer ID-signs, notarizes, staples, zips,
+uploads the `.zip` to the GitHub release, publishes the EdDSA-signed appcast to
+`docs/yahoo-keykey-2/appcast.xml` on the website repo, and bumps the Homebrew cask.
+It requires these repository secrets: `DEVELOPER_ID_CERT_P12_BASE64`,
+`DEVELOPER_ID_CERT_PASSWORD`, `NOTARY_KEY_P8_BASE64`, `NOTARY_KEY_ID`,
+`NOTARY_ISSUER_ID`, `PUBLIC_RELEASE_TOKEN`, `SPARKLE_EDDSA_PRIVATE_KEY` (the same
+set used by clipmenu-2 / ice-2).
 
 1. Bump `CFBundleShortVersionString` **and** `CFBundleVersion` in `App/Info.plist`.
    `CFBundleVersion` must strictly increase — Sparkle compares it to decide what's
-   newer.
+   newer. (The CI build fails if the tag doesn't match `CFBundleShortVersionString`.)
+
+### Per release (manual fallback)
+
+If running locally instead of CI:
+
+1. Bump the versions as above.
 2. Run `tools/package-release.sh` with `DEVELOPER_ID_APP` (and `NOTARY_PROFILE`)
    set. In addition to the `.zip`, it writes **`build/appcast.xml`**
    (EdDSA-signed; enclosure URL → the GitHub release zip).
@@ -112,8 +128,8 @@ who installed directly (not via Homebrew) get updates automatically.
    downloads this) alongside the `.pkg` (first-time users). The zip must be named
    `YahooKeyKey2-<version>.zip` so the appcast URL matches.
 4. **Publish the appcast:** copy `build/appcast.xml` into the website repo at
-   `docs/keykey/appcast.xml`, commit, and push. GitHub Pages serves it at
-   `https://www.dragonapp.com/keykey/appcast.xml` — the `SUFeedURL` the app reads.
+   `docs/yahoo-keykey-2/appcast.xml`, commit, and push. GitHub Pages serves it at
+   `https://www.dragonapp.com/yahoo-keykey-2/appcast.xml` — the `SUFeedURL` the app reads.
 5. Bump the Homebrew cask `Casks/yahoo-keykey-2.rb` in `teddychan/homebrew-tap`
    (version + the `.zip` sha256; the cask installs the app from the `.zip`).
 

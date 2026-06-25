@@ -145,7 +145,7 @@ if [ -n "${DEVELOPER_ID_APP:-}" ]; then
   echo "==> Generating Sparkle appcast"
   APPCAST="$BUILD/appcast.xml"
   "$ROOT/tools/update-appcast.sh" "$ZIP" "$VERSION" "$APPCAST"
-  echo "==> Appcast ready: $APPCAST (commit to www.dragonapp.com:docs/keykey/appcast.xml)"
+  echo "==> Appcast ready: $APPCAST (commit to www.dragonapp.com:docs/yahoo-keykey-2/appcast.xml)"
 else
   echo "==> Skipping appcast (ad-hoc build; Sparkle needs the Developer ID zip)"
 fi
