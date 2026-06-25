@@ -86,7 +86,7 @@
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://www.dragonapp.com/keykey/appcast.xml</string>
+	<string>https://www.dragonapp.com/yahoo-keykey-2/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>p+F/ivF5bAYcmuNuCMNHcRv123A6LHFpCBagFm7Adu8=</string>
 	<key>SUScheduledCheckInterval</key>
