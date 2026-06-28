@@ -2,6 +2,12 @@
 
 A plain-language list of changes in each version, newest first.
 
+## 1.4.1
+
+- **Fixed: the candidate text size now sticks.** Picking 小 / 中 / 大 from the
+  **「候選字大小」** menu had no effect — your choice was never saved. It now applies
+  and is remembered, the way it was meant to.
+
 ## 1.4.0
 
 - **Choose your candidate text size.** The input menu now has a new
