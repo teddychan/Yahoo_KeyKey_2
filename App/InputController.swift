@@ -95,21 +95,21 @@ final class InputController: IMKInputController {
         convert.state = Preferences.outputSimplifiedEnabled ? .on : .off
         menu.addItem(convert)
 
-        // Candidate-window font size (候選字大小): a submenu of named sizes. The chosen
-        // size is read live by CandidateWindow on the next composition; the checkmark
-        // marks the active size.
-        let fontSize = NSMenuItem(title: "候選字大小", action: nil, keyEquivalent: "")
-        let fontSubmenu = NSMenu()
+        // Candidate-window font size (候選字大小). The macOS input menu routes only
+        // TOP-LEVEL item selections back to the controller — items nested in a submenu
+        // are shown but never fire — so the sizes are flat items under a disabled
+        // header. The chosen size is read live by CandidateWindow on the next
+        // composition; the checkmark marks the active size.
+        let fontHeader = NSMenuItem(title: "候選字大小", action: nil, keyEquivalent: "")
+        fontHeader.isEnabled = false
+        menu.addItem(fontHeader)
         let currentFontSize = Preferences.candidateFontSize
-        for (title, size) in Self.candidateFontSizeChoices {
-            let item = NSMenuItem(title: title, action: #selector(setCandidateFontSize(_:)), keyEquivalent: "")
+        for (title, size, action) in Self.candidateFontSizeChoices {
+            let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
             item.target = self
-            item.tag = Int(size)
             item.state = (currentFontSize == size) ? .on : .off
-            fontSubmenu.addItem(item)
+            menu.addItem(item)
         }
-        fontSize.submenu = fontSubmenu
-        menu.addItem(fontSize)
 
         // 2. Settings specific to the active input method (grouped with their method).
         // Empty for Cangjie/Simplex today; future methods supply items via methodMenuItems.
@@ -142,15 +142,19 @@ final class InputController: IMKInputController {
         Preferences.outputSimplifiedEnabled.toggle()
     }
 
-    // Named candidate-window font sizes (display title → point size), all within the
-    // Preferences clamp (14–28); the default 18 is "中".
-    private static let candidateFontSizeChoices: [(String, CGFloat)] = [
-        ("小", 14), ("中", 18), ("大", 24),
+    // Named candidate-window font sizes (display title → point size → menu action),
+    // all within the Preferences clamp (14–28); the default 18 is "中". Each size has
+    // its own no-argument selector so it dispatches exactly like the toggles above —
+    // the input menu's cross-process routing doesn't preserve a shared handler's tag.
+    private static let candidateFontSizeChoices: [(title: String, size: CGFloat, action: Selector)] = [
+        ("小", 14, #selector(setCandidateFontSizeSmall)),
+        ("中", 18, #selector(setCandidateFontSizeMedium)),
+        ("大", 24, #selector(setCandidateFontSizeLarge)),
     ]
 
-    @objc private func setCandidateFontSize(_ sender: NSMenuItem) {
-        Preferences.candidateFontSize = CGFloat(sender.tag)
-    }
+    @objc private func setCandidateFontSizeSmall() { Preferences.candidateFontSize = 14 }
+    @objc private func setCandidateFontSizeMedium() { Preferences.candidateFontSize = 18 }
+    @objc private func setCandidateFontSizeLarge() { Preferences.candidateFontSize = 24 }
 
     @objc private func checkForUpdates() {
         Updater.shared.checkForUpdates()
