@@ -26,16 +26,16 @@
 
     <choices-outline>
         <line choice="default">
-            <line choice="com.github.teddychan.inputmethod.YahooKeyKey2.pkg"/>
+            <line choice="com.dragonapp.yahoo-keykey.pkg"/>
         </line>
     </choices-outline>
 
     <choice id="default"/>
-    <choice id="com.github.teddychan.inputmethod.YahooKeyKey2.pkg" visible="false">
-        <pkg-ref id="com.github.teddychan.inputmethod.YahooKeyKey2.pkg"/>
+    <choice id="com.dragonapp.yahoo-keykey.pkg" visible="false">
+        <pkg-ref id="com.dragonapp.yahoo-keykey.pkg"/>
     </choice>
 
-    <pkg-ref id="com.github.teddychan.inputmethod.YahooKeyKey2.pkg"
+    <pkg-ref id="com.dragonapp.yahoo-keykey.pkg"
              version="__VERSION__"
              onConclusion="RequireLogout">__COMPONENT_PKG__</pkg-ref>
 </installer-gui-script>
