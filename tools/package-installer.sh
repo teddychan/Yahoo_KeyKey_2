@@ -30,7 +30,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD="$ROOT/build"
 APP="$BUILD/YahooKeyKey2.app"
 INSTALLER_SRC="$ROOT/installer"
-PKG_IDENTIFIER="com.github.teddychan.inputmethod.YahooKeyKey2.pkg"
+PKG_IDENTIFIER="com.dragonapp.yahoo-keykey.pkg"
 
 # --- 1. Build the .app (signed/notarized if env set, else ad-hoc) -----------
 if [ -n "${DEVELOPER_ID_APP:-}" ]; then

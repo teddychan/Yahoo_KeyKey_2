@@ -11,20 +11,20 @@
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.github.teddychan.inputmethod.YahooKeyKey2</string>
+	<string>com.dragonapp.yahoo-keykey</string>
 	<key>CFBundleName</key>
 	<string>Yahoo KeyKey 2</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.7.0</string>
+	<string>1.7.1</string>
 	<key>CFBundleVersion</key>
-	<string>15</string>
+	<string>16</string>
 	<key>ComponentInputModeDict</key>
 	<dict>
 		<key>tsInputModeListKey</key>
 		<dict>
-			<key>com.github.teddychan.inputmethod.YahooKeyKey2.Cangjie</key>
+			<key>com.dragonapp.yahoo-keykey.Cangjie</key>
 			<dict>
 				<key>TISIntendedLanguage</key>
 				<string>zh-Hant</string>
@@ -43,7 +43,7 @@
 				<key>tsInputModeScriptKey</key>
 				<string>smTradChinese</string>
 			</dict>
-			<key>com.github.teddychan.inputmethod.YahooKeyKey2.Simplex</key>
+			<key>com.dragonapp.yahoo-keykey.Simplex</key>
 			<dict>
 				<key>TISIntendedLanguage</key>
 				<string>zh-Hant</string>
@@ -65,14 +65,14 @@
 		</dict>
 		<key>tsVisibleInputModeOrderedArrayKey</key>
 		<array>
-			<string>com.github.teddychan.inputmethod.YahooKeyKey2.Cangjie</string>
-			<string>com.github.teddychan.inputmethod.YahooKeyKey2.Simplex</string>
+			<string>com.dragonapp.yahoo-keykey.Cangjie</string>
+			<string>com.dragonapp.yahoo-keykey.Simplex</string>
 		</array>
 		<key>tsInputMethodIconFileKey</key>
 		<string>YahooKeyKey.tiff</string>
 	</dict>
 	<key>InputMethodConnectionName</key>
-	<string>com.github.teddychan.inputmethod.YahooKeyKey2_Connection</string>
+	<string>com.dragonapp.yahoo-keykey_Connection</string>
 	<key>InputMethodServerControllerClass</key>
 	<string>InputController</string>
 	<key>InputMethodServerDelegateClass</key>
@@ -92,7 +92,7 @@
 	<key>SUScheduledCheckInterval</key>
 	<integer>86400</integer>
 	<key>TISInputSourceID</key>
-	<string>com.github.teddychan.inputmethod.YahooKeyKey2</string>
+	<string>com.dragonapp.yahoo-keykey</string>
 	<key>TISIntendedLanguage</key>
 	<string>zh-Hant</string>
 	<key>tsInputMethodCharacterRepertoireKey</key>

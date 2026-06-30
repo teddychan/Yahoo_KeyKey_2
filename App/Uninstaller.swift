@@ -42,7 +42,7 @@ enum Uninstaller {
     }
 
     private static func perform() {
-        let bundleID = Bundle.main.bundleIdentifier ?? "com.github.teddychan.inputmethod.YahooKeyKey2"
+        let bundleID = Bundle.main.bundleIdentifier ?? "com.dragonapp.yahoo-keykey"
 
         // 1. Deselect/disable our TIS input sources FIRST.
         disableInputSources(bundleIDPrefix: bundleID)
