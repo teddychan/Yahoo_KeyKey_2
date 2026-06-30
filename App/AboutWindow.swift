@@ -32,6 +32,10 @@ final class AboutWindowController: NSWindowController {
 
         let descriptionLabel = NSTextField(labelWithString: "倉頡／簡易 輸入法")
 
+        // Primary links (liquid-glass §5A): Website on dragonapp.com, Support on GitHub Issues.
+        let websiteButton = linkButton("網站：www.dragonapp.com/keykey", action: #selector(openWebsite))
+        let supportButton = linkButton("在 GitHub 回報問題：teddychan/yahoo-keykey-2", action: #selector(openSupport))
+
         let originHeading = NSTextField(labelWithString: "向原版 Yahoo! KeyKey 致敬")
         originHeading.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
 
@@ -55,6 +59,7 @@ final class AboutWindowController: NSWindowController {
         attribution.textColor = .secondaryLabelColor
 
         let stack = NSStackView(views: [nameLabel, versionLabel, descriptionLabel,
+                                        websiteButton, supportButton,
                                         originHeading, originAttribution,
                                         dataHeading, attribution])
         stack.orientation = .vertical
@@ -69,6 +74,29 @@ final class AboutWindowController: NSWindowController {
             stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -24),
             stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 24),
         ])
+    }
+
+    @objc private func openWebsite() {
+        if let url = URL(string: "https://www.dragonapp.com/keykey") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    @objc private func openSupport() {
+        if let url = URL(string: "https://github.com/teddychan/yahoo-keykey-2/issues") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    /// A left-aligned, borderless button styled like a link.
+    private func linkButton(_ title: String, action: Selector) -> NSButton {
+        let button = NSButton(title: title, target: self, action: action)
+        button.isBordered = false
+        button.contentTintColor = .linkColor
+        button.alignment = .left
+        button.setButtonType(.momentaryChange)
+        button.font = NSFont.systemFont(ofSize: 11)
+        return button
     }
 
     func show() {

@@ -2,6 +2,10 @@
 
 A plain-language list of changes in each version, newest first.
 
+## 1.7.2
+
+- The About window now links to the Yahoo! KeyKey 2 website (dragonapp.com/keykey) and to GitHub Issues for support, alongside the existing homage to the original Yahoo! KeyKey.
+
 ## 1.5.0
 
 - **Cangjie wildcard now works from the first key.** Typing **`*`** as the very
