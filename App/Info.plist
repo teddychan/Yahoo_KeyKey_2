@@ -11,20 +11,20 @@
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.dragonapp.yahoo-keykey</string>
+	<string>com.dragonapp.inputmethod.yahoo-keykey</string>
 	<key>CFBundleName</key>
 	<string>Yahoo KeyKey 2</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.0.0</string>
+	<string>2.0.1</string>
 	<key>CFBundleVersion</key>
-	<string>18</string>
+	<string>19</string>
 	<key>ComponentInputModeDict</key>
 	<dict>
 		<key>tsInputModeListKey</key>
 		<dict>
-			<key>com.dragonapp.yahoo-keykey.Cangjie</key>
+			<key>com.dragonapp.inputmethod.yahoo-keykey.Cangjie</key>
 			<dict>
 				<key>TISIntendedLanguage</key>
 				<string>zh-Hant</string>
@@ -43,7 +43,7 @@
 				<key>tsInputModeScriptKey</key>
 				<string>smTradChinese</string>
 			</dict>
-			<key>com.dragonapp.yahoo-keykey.Simplex</key>
+			<key>com.dragonapp.inputmethod.yahoo-keykey.Simplex</key>
 			<dict>
 				<key>TISIntendedLanguage</key>
 				<string>zh-Hant</string>
@@ -65,14 +65,14 @@
 		</dict>
 		<key>tsVisibleInputModeOrderedArrayKey</key>
 		<array>
-			<string>com.dragonapp.yahoo-keykey.Cangjie</string>
-			<string>com.dragonapp.yahoo-keykey.Simplex</string>
+			<string>com.dragonapp.inputmethod.yahoo-keykey.Cangjie</string>
+			<string>com.dragonapp.inputmethod.yahoo-keykey.Simplex</string>
 		</array>
 		<key>tsInputMethodIconFileKey</key>
 		<string>YahooKeyKey.tiff</string>
 	</dict>
 	<key>InputMethodConnectionName</key>
-	<string>com.dragonapp.yahoo-keykey_Connection</string>
+	<string>com.dragonapp.inputmethod.yahoo-keykey_Connection</string>
 	<key>InputMethodServerControllerClass</key>
 	<string>InputController</string>
 	<key>InputMethodServerDelegateClass</key>
@@ -92,7 +92,7 @@
 	<key>SUScheduledCheckInterval</key>
 	<integer>86400</integer>
 	<key>TISInputSourceID</key>
-	<string>com.dragonapp.yahoo-keykey</string>
+	<string>com.dragonapp.inputmethod.yahoo-keykey</string>
 	<key>TISIntendedLanguage</key>
 	<string>zh-Hant</string>
 	<key>tsInputMethodCharacterRepertoireKey</key>
