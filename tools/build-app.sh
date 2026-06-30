@@ -12,7 +12,19 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD="$ROOT/build"
-APP="$BUILD/YahooKeyKey2.app"
+# Debug identity (opt-in via KEYKEY_DEBUG_ID=1): build a SEPARATE input method named
+# "Yahoo KeyKey 2 Debug" with bundle id com.dragonapp.inputmethod.yahoo-keykey.debug, so a local test
+# build never collides with / shadows the installed RELEASE IME. (Two bundles sharing the
+# release id register as duplicates in Launch Services and hide the real input source from
+# the Input Sources picker.) Release/CI builds leave KEYKEY_DEBUG_ID unset and are unaffected.
+RELEASE_BUNDLE_ID="com.dragonapp.inputmethod.yahoo-keykey"
+if [[ "${KEYKEY_DEBUG_ID:-}" == "1" ]]; then
+  APP_BUNDLE_NAME="Yahoo KeyKey 2 Debug"
+  DEBUG_BUNDLE_ID="${RELEASE_BUNDLE_ID}.debug"
+else
+  APP_BUNDLE_NAME="YahooKeyKey2"
+fi
+APP="$BUILD/${APP_BUNDLE_NAME}.app"
 ENGINE_SRC="$ROOT/Packages/KeyKeyEngine/Sources/KeyKeyEngine"
 APP_SRC="$ROOT/App"
 MODULE_DIR="$BUILD/modules"
@@ -107,6 +119,30 @@ echo "==> Copying localized strings (.lproj)"
 for lproj in "$APP_SRC"/*.lproj; do
   [ -d "$lproj" ] && cp -R "$lproj" "$APP/Contents/Resources/"
 done
+
+if [[ "${KEYKEY_DEBUG_ID:-}" == "1" ]]; then
+  echo "==> Applying debug identity ($DEBUG_BUNDLE_ID / \"$APP_BUNDLE_NAME\")"
+  PLIST="$APP/Contents/Info.plist"
+  # Single pass moves every release-id occurrence into the .debug namespace: CFBundleIdentifier,
+  # TISInputSourceID, InputMethodConnectionName, and the two ComponentInputModeDict mode ids
+  # (...Cangjie / ...Simplex). InputController matches modes by the ".Cangjie"/".Simplex" SUFFIX,
+  # which is preserved, so mode switching keeps working. SUFeedURL/SUPublicEDKey don't contain
+  # the base id, so they're untouched.
+  sed -i '' "s|${RELEASE_BUNDLE_ID}|${DEBUG_BUNDLE_ID}|g" "$PLIST"
+  # Distinct name in the menu bar / Input Sources picker.
+  sed -i '' "s|<string>Yahoo KeyKey 2</string>|<string>Yahoo KeyKey 2 Debug</string>|g" "$PLIST"
+  # A throwaway local build must not offer to auto-update itself off the release appcast.
+  plutil -replace SUEnableAutomaticChecks -bool false "$PLIST"
+  # Re-key the localized input-mode display names (倉頡 / 速成) to the .debug mode ids, and
+  # re-label the localized app name so the picker/menu show "Yahoo KeyKey 2 Debug" (the
+  # localized CFBundleDisplayName here would otherwise override the Info.plist value above).
+  for sf in "$APP/Contents/Resources"/*.lproj/InfoPlist.strings; do
+    [ -f "$sf" ] || continue
+    sed -i '' "s|${RELEASE_BUNDLE_ID}|${DEBUG_BUNDLE_ID}|g" "$sf"
+    sed -i '' 's|"Yahoo KeyKey 2"|"Yahoo KeyKey 2 Debug"|g' "$sf"
+  done
+  plutil -lint "$PLIST"
+fi
 
 echo "==> Embedding Sparkle.framework"
 mkdir -p "$APP/Contents/Frameworks"
