@@ -2,6 +2,10 @@
 
 A plain-language list of changes in each version, newest first.
 
+## 2.0.1
+
+- **Fixed: Yahoo KeyKey 2 now appears in System Settings → Keyboard → Input Sources again.** Version 2.0.0 could be installed but never showed up as an input method you could add, because the rebrand accidentally changed the app's identifier to a form macOS does not recognise as an input method. The identifier now includes the required `inputmethod` component, so the input method registers correctly. If you had 2.0.0, install 2.0.1 and add **Yahoo KeyKey 2** under **Chinese, Traditional**.
+
 ## 2.0.0
 
 - Version numbers now start at **2.x** to match the product name, **Yahoo! KeyKey 2**. No functional change from 1.7.2.
