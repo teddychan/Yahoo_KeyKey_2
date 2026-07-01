@@ -33,7 +33,8 @@ final class AboutWindowController: NSWindowController {
         let nameLabel = NSTextField(labelWithString: Self.appName)
         nameLabel.font = NSFont.systemFont(ofSize: 18, weight: .semibold)
 
-        let versionLabel = NSTextField(labelWithString: "版本 \(version)")
+        // Mark the version line too (not just the name/title) so a debug build is unmistakable.
+        let versionLabel = NSTextField(labelWithString: "版本 \(version)" + (Self.isDebugBuild ? " (Debug)" : ""))
         versionLabel.textColor = .secondaryLabelColor
 
         let descriptionLabel = NSTextField(labelWithString: "倉頡／簡易 輸入法")
